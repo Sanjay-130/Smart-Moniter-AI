@@ -11,6 +11,8 @@ import {
   Divider,
   Paper,
   IconButton,
+  Alert,
+  AlertTitle,
 } from '@mui/material';
 import { useSelector, useDispatch } from 'react-redux';
 import { toast } from 'react-toastify';
@@ -59,6 +61,10 @@ const ProfilePage = () => {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleRemoveProfilePic = () => {
+    setFormData({ ...formData, profilePic: '' });
   };
 
   const handleChange = (e) => {
@@ -122,9 +128,26 @@ const ProfilePage = () => {
   return (
     <PageContainer title="Student Profile" description="Manage your profile">
       <Box sx={{ maxWidth: 1200, margin: '0 auto' }}>
-        <Typography variant="h4" mb={3} fontWeight={600}>
+        <Typography variant="h4" mb={2} fontWeight={600}>
           My Profile
         </Typography>
+
+        {userInfo?.malpracticeCount > 0 && (
+          <Alert
+            severity={userInfo.malpracticeCount >= 2 ? "error" : "warning"}
+            sx={{ mb: 3, borderRadius: 0 }}
+          >
+            <AlertTitle sx={{ fontWeight: 700 }}>
+              {userInfo.malpracticeCount >= 2 ? "Critical Malpractice Warning" : "Malpractice Warning"}
+            </AlertTitle>
+            You have recorded <strong>{userInfo.malpracticeCount}</strong> malpractice incident{userInfo.malpracticeCount > 1 ? 's' : ''}.
+            {userInfo.malpracticeCount >= 2 ? (
+              <> <strong>One more incident will result in an automatic account block.</strong> Please maintain exam integrity.</>
+            ) : (
+              <> Please be careful. Repeated incidents will lead to an automatic account block.</>
+            )}
+          </Alert>
+        )}
 
         <Grid container spacing={3}>
           {/* Profile Card */}
@@ -141,7 +164,7 @@ const ProfilePage = () => {
                     mb: 2,
                   }}
                 >
-                  {!userInfo?.profilePic && !formData.profilePic && getInitials(userInfo?.name)}
+                  {!(isEditing ? formData.profilePic : userInfo?.profilePic) && getInitials(userInfo?.name)}
                 </Avatar>
                 {isEditing && (
                   <>
@@ -160,7 +183,7 @@ const ProfilePage = () => {
                         sx={{
                           position: 'absolute',
                           bottom: 15,
-                          right: 0,
+                          right: -5,
                           bgcolor: 'white',
                           '&:hover': { bgcolor: '#f5f5f5' },
                           boxShadow: 2,
@@ -170,6 +193,24 @@ const ProfilePage = () => {
                         <IconEdit size={16} />
                       </IconButton>
                     </label>
+                    {formData.profilePic && (
+                      <IconButton
+                        color="error"
+                        aria-label="remove picture"
+                        onClick={handleRemoveProfilePic}
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          right: -5,
+                          bgcolor: 'white',
+                          '&:hover': { bgcolor: '#f5f5f5' },
+                          boxShadow: 2,
+                        }}
+                        size="small"
+                      >
+                        <IconX size={16} />
+                      </IconButton>
+                    )}
                   </>
                 )}
               </Box>
@@ -190,7 +231,7 @@ const ProfilePage = () => {
                   color: 'primary.main',
                   py: 0.5,
                   px: 2,
-                  borderRadius: 2,
+                  borderRadius: 0,
                   display: 'inline-block',
                   mt: 2,
                 }}

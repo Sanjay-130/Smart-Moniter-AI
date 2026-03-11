@@ -91,8 +91,52 @@ export default function WebCamComponent({ cheatingLog, updateCheatingLog, onEven
     try {
       detectionCountRef.current++;
 
-      // Run detection with relaxed threshold of 0.4 (40% confidence) for more liberal detection
-      const predictions = await model.detect(video, undefined, 0.4);
+      // Run detection with relaxed threshold of 0.4 (40% confidence)
+      let predictions = await model.detect(video, undefined, 0.4);
+
+      // --- ZOOM FILTER: Only include objects in the visible (zoomed) area ---
+      const zoomScale = 1.6;
+      const cropFactor = 1 / zoomScale; // 0.625
+      const pad = (1 - cropFactor) / 2; // 0.1875 (18.75% hidden on each side)
+
+      predictions = predictions.filter(p => {
+        const [x, y, w, h] = p.bbox;
+        const centerX = x + w / 2;
+        const centerY = y + h / 2;
+
+        const isVisibleX = centerX >= videoWidth * pad && centerX <= videoWidth * (1 - pad);
+        const isVisibleY = centerY >= videoHeight * pad && centerY <= videoHeight * (1 - pad);
+
+        // Always include the person if they are mostly visible, but keep prohibited objects strict
+        if (p.class === 'person') return true;
+        return isVisibleX && isVisibleY;
+      });
+
+      // --- SMART FILTER: Focus on User & Immediate Surroundings ---
+      // Determine the "Main User" (largest person in frame)
+      const personsFound = predictions.filter(p => p.class === 'person');
+      if (personsFound.length > 0) {
+        const largestPerson = personsFound.reduce((max, p) => {
+          const area = p.bbox[2] * p.bbox[3]; // width * height
+          return area > max.area ? { p, area } : max;
+        }, { p: null, area: 0 });
+
+        // Filter: Keep only the main user and people of comparable size (immediate vicinity)
+        // This removes "way beyond" background faces
+        if (largestPerson.p) {
+          predictions = predictions.filter(p => {
+            if (p.class !== 'person') return true; // Always keep prohibited objects (phones, etc.)
+
+            const area = p.bbox[2] * p.bbox[3];
+            const isMainUser = p === largestPerson.p;
+            // A person must be at least 30% of the main user's size to be considered "near"
+            const isNearby = area > (largestPerson.area * 0.3);
+
+            return isMainUser || isNearby;
+          });
+        }
+      }
+      // -----------------------------------------------------------
 
       // Log detection stats every 10 runs
       if (detectionCountRef.current % 10 === 0) {
@@ -198,9 +242,9 @@ export default function WebCamComponent({ cheatingLog, updateCheatingLog, onEven
 
       // 5. LEANING BACK
       if (isLeaningBack && !prev.leaning) {
-        const newCount = (cheatingLog.prohibitedObjectCount || 0) + 1;
+        const newCount = (cheatingLog.leaningBackCount || 0) + 1;
         console.log('[WebCam] 🚨 NEW INCIDENT: Leaning back detected!');
-        captureIncident('leaning', 'prohibitedObjectCount', newCount, { type: 'suspicious', message: 'Leaning Back - Suspicious!', severity: 'warning' });
+        captureIncident('leaning', 'leaningBackCount', newCount, { type: 'suspicious', message: 'Leaning Back - Suspicious!', severity: 'warning' });
       }
 
       // Update state for next frame
@@ -306,7 +350,7 @@ export default function WebCamComponent({ cheatingLog, updateCheatingLog, onEven
               width: '100%',
               height: '100%',
               objectFit: 'cover',
-              transform: 'scale(1.3)', // Zoom in 30% to focus on person
+              transform: 'scale(1.6)', // Zoom in to focus on person
             }}
           />
           <canvas
@@ -319,6 +363,7 @@ export default function WebCamComponent({ cheatingLog, updateCheatingLog, onEven
               height: '100%',
               zIndex: 10,
               pointerEvents: 'none',
+              transform: 'scale(1.6)', // Sync canvas zoom with video
             }}
           />
         </>

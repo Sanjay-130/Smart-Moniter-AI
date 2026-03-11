@@ -7,6 +7,7 @@ import AuthFeatures from './auth/AuthFeatures';
 import { useFormik } from 'formik';
 import * as yup from 'yup';
 import { Link, useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import ArrowBackIosNewOutlinedIcon from '@mui/icons-material/ArrowBackIosNewOutlined';
 
@@ -17,22 +18,39 @@ const validationSchema = yup.object({
 
 const AdminLogin = () => {
   const navigate = useNavigate();
+  const { userInfo } = useSelector((state) => state.auth);
 
   useEffect(() => {
-    const isAdmin = localStorage.getItem('isAdmin') === 'true';
-    if (isAdmin) navigate('/admin');
-  }, [navigate]);
+    const isAdminFlag = localStorage.getItem('isAdmin') === 'true';
+    if (isAdminFlag || userInfo?.role === 'admin') navigate('/admin');
+  }, [navigate, userInfo]);
 
   const formik = useFormik({
     initialValues: { email: '', password: '' },
     validationSchema,
-    onSubmit: ({ email, password }) => {
-      if (email === 'admin@collage.com' && password === 'admin123') {
-        localStorage.setItem('isAdmin', 'true');
-        toast.success('Admin login successful');
-        navigate('/admin');
-      } else {
-        toast.error('Invalid admin credentials');
+    onSubmit: async ({ email, password }) => {
+      try {
+        const response = await fetch('/api/users/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await response.json();
+
+        if (response.ok) {
+          if (data.role === 'admin') {
+            localStorage.setItem('isAdmin', 'true');
+            toast.success('Admin login successful');
+            navigate('/admin');
+          } else {
+            toast.error('Access denied. This account is not an administrator.');
+          }
+        } else {
+          toast.error(data.message || 'Invalid admin credentials');
+        }
+      } catch (error) {
+        toast.error('An error occurred during login. Please try again.');
+        console.error('Login error:', error);
       }
     },
   });
@@ -53,7 +71,7 @@ const AdminLogin = () => {
           }}
         >
           <Grid item xs={12} sm={12} lg={4} xl={3} display="flex" justifyContent="center" alignItems="center">
-            <Card elevation={6} sx={{ p: { xs: 3, sm: 4 }, zIndex: 1, width: '100%', maxWidth: '520px', borderRadius: 4, background: '#FFFFFF' }}>
+            <Card elevation={6} sx={{ p: { xs: 3, sm: 4 }, zIndex: 1, width: '100%', maxWidth: '520px', borderRadius: 0, background: '#FFFFFF' }}>
               <Box display="flex" justifyContent="flex-start" mb={1}>
                 <Button
                   component={Link}

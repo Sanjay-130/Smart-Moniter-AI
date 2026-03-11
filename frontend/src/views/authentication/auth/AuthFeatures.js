@@ -17,7 +17,7 @@ const FeatureCard = ({ icon: Icon, title, description }) => (
             background: 'rgba(255, 255, 255, 0.03)',
             backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255, 255, 255, 0.1)',
-            borderRadius: '16px',
+            borderRadius: 0,
             color: 'white',
             width: '280px',
             transition: 'all 0.3s ease',
@@ -78,35 +78,26 @@ const AuthFeatures = ({ role }) => {
     return (
         <Box
             sx={{
-                position: 'absolute',
+                position: 'fixed',
                 inset: 0,
                 pointerEvents: 'none',
-                display: 'flex',
+                zIndex: 0,
+                display: { xs: 'none', xl: 'flex' }, // Only show on very large screens to avoid any overlap
                 alignItems: 'center',
-                justifyContent: 'center',
+                justifyContent: 'space-between',
+                px: 6,
             }}
         >
-            <Box
-                sx={{
-                    width: '100%',
-                    maxWidth: '1400px',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    px: 4,
-                    pointerEvents: 'auto'
-                }}
-            >
-                <Stack spacing={4}>
-                    <FeatureCard {...currentFeatures[0]} />
-                    <FeatureCard {...currentFeatures[1]} />
-                </Stack>
-                <Stack spacing={4}>
-                    <FeatureCard {...currentFeatures[2]} />
-                    <FeatureCard {...currentFeatures[3]} />
-                </Stack>
-            </Box>
+            <Stack spacing={4} sx={{ pointerEvents: 'auto' }}>
+                <FeatureCard {...currentFeatures[0]} />
+                <FeatureCard {...currentFeatures[1]} />
+            </Stack>
+            <Stack spacing={4} sx={{ pointerEvents: 'auto' }}>
+                <FeatureCard {...currentFeatures[2]} />
+                <FeatureCard {...currentFeatures[3]} />
+            </Stack>
         </Box>
     );
 };
 
-export default AuthFeatures;
+export default React.memo(AuthFeatures);

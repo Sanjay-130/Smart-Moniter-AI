@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { styled, Container, Box } from '@mui/material';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 
 import Header from './header/Header';
 import Sidebar from './sidebar/Sidebar';
@@ -23,7 +23,11 @@ const PageWrapper = styled('div')(() => ({
 const ExamLayout = () => {
   const [isSidebarOpen, setSidebarOpen] = useState(true);
   const [isMobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  // const lgUp = useMediaQuery((theme) => theme.breakpoints.up("lg"));
+  const location = useLocation();
+
+  // Check if current path is a test page (has 3 parts after /exam/:id/:testId)
+  // path: /exam/123/456 -> parts: ["", "exam", "123", "456"] -> length 4
+  const isTestPage = location.pathname.split('/').length >= 4;
 
   return (
     <Box>
@@ -33,12 +37,14 @@ const ExamLayout = () => {
       {/* ------------------------------------------- */}
       <PageWrapper>
         {/* ------------------------------------------- */}
-        {/* Header */}
+        {/* Header - Hidden on Test Page */}
         {/* ------------------------------------------- */}
-        <Header
-          toggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
-          toggleMobileSidebar={() => setMobileSidebarOpen(true)}
-        />
+        {!isTestPage && (
+          <Header
+            toggleSidebar={() => setSidebarOpen(!isSidebarOpen)}
+            toggleMobileSidebar={() => setMobileSidebarOpen(true)}
+          />
+        )}
         {/* ------------------------------------------- */}
         {/* PageContent */}
         {/* ------------------------------------------- */}

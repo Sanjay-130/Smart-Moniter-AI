@@ -31,32 +31,55 @@ export const submitExam = asyncHandler(async (req, res) => {
   let maxPossibleScore = 0;
   const resultDetails = [];
 
+  console.log(`Submitting exam ${examId} for student ${studentId}`);
+  // console.log('Received answers:', JSON.stringify(answers, null, 2));
+
   for (const question of examQuestions) {
-    // Add to max possible score
     const qMarks = question.marks || 1;
     maxPossibleScore += qMarks;
 
-    const studentAnswer = answers.find(a => a.questionId === question._id.toString());
-    // Determine the correct option's _id (options are subdocuments with isCorrect boolean)
+    // Find student answer - matching string IDs
+    const qIdStr = question._id.toString();
+    const studentAnswer = answers.find(a => String(a.questionId) === qIdStr);
+    
+    // Determine the correct option for MCQs
     const correctOption = question.options.find((opt) => opt.isCorrect);
     const correctOptionId = correctOption ? correctOption._id.toString() : null;
 
-    // Normalize incoming student answer values to expected types
     const selectedOption = studentAnswer && studentAnswer.selectedOption ? String(studentAnswer.selectedOption) : '';
-    // For CODE questions, relies on client-side 'isCorrect' flag if present, else default to false for now
+    
     let isCorrect = false;
+    let earnedMarks = 0;
+    let passedTestCases = 0;
+    let totalTestCases = 0;
 
     if (question.questionType === 'MCQ') {
       isCorrect = Boolean(selectedOption && correctOptionId && selectedOption === correctOptionId);
+      if (isCorrect) earnedMarks = qMarks;
     } else if (question.questionType === 'CODE') {
-      if (studentAnswer && studentAnswer.isCorrect) isCorrect = true;
+      passedTestCases = studentAnswer?.passedTestCases || 0;
+      // Use test cases from answer if provided, else from question
+      totalTestCases = studentAnswer?.totalTestCases || (question.codeQuestion?.testCases?.length || 0);
+      
+      if (totalTestCases > 0) {
+        earnedMarks = (passedTestCases / totalTestCases) * qMarks;
+        isCorrect = passedTestCases === totalTestCases;
+      } else {
+        // Fallback if no test cases defined
+        isCorrect = !!studentAnswer?.isCorrect;
+        if (isCorrect) earnedMarks = qMarks;
+      }
     }
 
-    if (isCorrect) totalScore += qMarks;
+    totalScore += earnedMarks;
 
     resultDetails.push({
       questionId: question._id,
       selectedOption,
+      codeAnswer: studentAnswer?.codeAnswer || '',
+      language: studentAnswer?.language || '',
+      passedTestCases,
+      totalTestCases,
       isCorrect
     });
   }

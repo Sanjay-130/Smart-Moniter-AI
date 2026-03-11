@@ -1,7 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import {
-    Card,
-    CardContent,
     Typography,
     Box,
     Stack,
@@ -11,84 +9,135 @@ import {
     CircularProgress,
     Chip,
     Paper,
-    Divider,
-    Alert,
+    Table,
+    TableBody,
+    TableCell,
+    TableContainer,
+    TableHead,
+    TableRow,
+    TextField,
+    Tabs,
+    Tab,
 } from '@mui/material';
-import Editor from '@monaco-editor/react';
+import CodeMirror from '@uiw/react-codemirror';
+import { python } from '@codemirror/lang-python';
+import { javascript } from '@codemirror/lang-javascript';
+import { java } from '@codemirror/lang-java';
+import { cpp } from '@codemirror/lang-cpp';
+import { vscodeDark } from '@uiw/codemirror-theme-vscode';
+
 import { useCompileCodeMutation } from 'src/slices/examApiSlice';
 import { toast } from 'react-toastify';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
 import CodeIcon from '@mui/icons-material/Code';
 import InputIcon from '@mui/icons-material/Input';
 import OutputIcon from '@mui/icons-material/Output';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 
 export default function CodeQuestion({
     questions,
+    studentAnswers,
     saveUserTestScore,
     saveStudentAnswer,
     submitTest,
     currentQuestion = 0,
     setCurrentQuestion,
     onAnswered,
-    onSelectionChange,
+    // onSelectionChange,
 }) {
     const q = questions[currentQuestion];
     const [code, setCode] = useState('');
     const [language, setLanguage] = useState('python');
-    const [output, setOutput] = useState('');
     const [testResults, setTestResults] = useState([]);
+    const [consoleOutput, setConsoleOutput] = useState({ stdout: '', stderr: '', hasError: false });
     const [isRunning, setIsRunning] = useState(false);
-    const [editorTheme, setEditorTheme] = useState('vs-dark');
+    const [editorTheme, setEditorTheme] = useState('dark');
+    const [customInput, setCustomInput] = useState('');
+    const [outputTab, setOutputTab] = useState(0); // 0=Test Results, 1=Console
+    const [hasRun, setHasRun] = useState(false);
+
+    const getLanguageExtension = (lang) => {
+        switch (lang) {
+            case 'python': return [python()];
+            case 'javascript': return [javascript({ jsx: true })];
+            case 'java': return [java()];
+            case 'cpp':
+            case 'c':
+                return [cpp()];
+            default: return [];
+        }
+    };
 
     const [compileCode] = useCompileCodeMutation();
     const [isLastQuestion, setIsLastQuestion] = useState(false);
 
-    // Language-specific starter templates
+    // Simple, clean language starter templates.
+    // Each just provides the minimal boilerplate so the student can start coding immediately.
     const getLanguageDefaults = (lang) => {
         const templates = {
-            python: `# Python Solution
-def solution():
-    # Write your code here
-    pass
 
-# Call your function
-solution()
-`,
-            javascript: `// JavaScript Solution
-function solution() {
-    // Write your code here
-}
+            python: `import sys
+input = sys.stdin.readline
 
-// Call your function
-solution();
+# Write your code here
 `,
+
+            javascript: `const lines = require('fs').readFileSync('/dev/stdin', 'utf8').trim().split('\n');
+let idx = 0;
+const nextLine = () => lines[idx++];
+
+// Write your code here
+`,
+
             java: `import java.util.Scanner;
 
-public class Solution {
+// Note: Use "class Solution" (not "public class")
+class Solution {
     public static void main(String[] args) {
         Scanner sc = new Scanner(System.in);
-        // Write your Java code here
-        
-        sc.close();
+
+        // Write your code here
     }
 }
 `,
+
+            cpp: `#include <bits/stdc++.h>
+using namespace std;
+
+int main() {
+    // Write your code here
+    return 0;
+}
+`,
+
+            c: `#include <stdio.h>
+
+int main() {
+    // Write your code here
+    return 0;
+}
+`,
         };
-        return templates[lang] || '';
+        return templates[lang] || '// Write your code here\n';
     };
+
 
     useEffect(() => {
         if (questions && questions.length > 0) {
             setIsLastQuestion(currentQuestion === questions.length - 1);
         }
-        // Reset state on question change
-        const defaultCode = getLanguageDefaults('python');
-        setCode(defaultCode);
+
+        // Always start fresh with the clean template — no code is saved between visits.
+        // This ensures each question opens with a clean slate.
+        setCode(getLanguageDefaults('python'));
         setLanguage('python');
-        setOutput('');
+        setConsoleOutput({ stdout: '', stderr: '', hasError: false });
         setTestResults([]);
+        setHasRun(false);
+        setOutputTab(0);
     }, [currentQuestion, questions]);
 
     const handleCodeChange = (value) => {
@@ -110,66 +159,96 @@ public class Solution {
 
     const executeCode = async () => {
         if (!code.trim()) {
-            toast.error('Please write some code.');
+            toast.error('Please write some code before running.');
             return;
         }
         setIsRunning(true);
         setTestResults([]);
-        setOutput('⏳ Running test cases...');
+        setConsoleOutput({ stdout: '', stderr: '', hasError: false });
+        setHasRun(true);
 
         const testCases = q.codeQuestion?.testCases || [];
+
+        // If no test cases, do a free run with custom input and show console
+        if (testCases.length === 0) {
+            try {
+                const res = await compileCode({ language, code, input: customInput }).unwrap();
+                const stdout = res.run?.stdout ?? '';
+                const stderr = res.run?.stderr ?? '';
+                // Compile error comes back in stderr with non-zero exit code
+                const hasError = !!(stderr && stderr.trim()) || (res.run?.code !== 0 && res.run?.code !== undefined);
+                setConsoleOutput({ stdout, stderr, hasError });
+                setOutputTab(1); // switch to Console tab
+            } catch (err) {
+                setConsoleOutput({ stdout: '', stderr: err?.data?.message || err.message || 'Unknown error', hasError: true });
+                setOutputTab(1);
+            } finally {
+                setIsRunning(false);
+            }
+            return;
+        }
+
+        // Run against all test cases
         const results = [];
-        let allPassed = true;
-
+        let lastStdout = '';
+        let lastStderr = '';
         try {
-            for (let i = 0; i < testCases.length; i++) {
-                const tc = testCases[i];
-                const res = await compileCode({ language, code, input: tc.input }).unwrap();
+            for (const tc of testCases) {
+                const res = await compileCode({ language, code, input: tc.input ?? '' }).unwrap();
+                const stdout = res.run?.stdout ?? '';
+                const stderr = res.run?.stderr ?? '';
+                lastStdout = stdout;
+                lastStderr = stderr;
 
-                const runOutput = res.run.stdout?.trim() || res.run.stderr?.trim() || '';
-                const passed = runOutput === tc.output?.trim();
-
-                if (!passed) allPassed = false;
+                // Execution error: non-zero exit or stderr present without stdout
+                const hasExecError = stderr.trim() && !stdout.trim();
+                const actualOutput = hasExecError ? '' : stdout.trim();
+                const passed = !hasExecError && (actualOutput === (tc.output ?? '').trim());
 
                 results.push({
-                    input: tc.input,
-                    expected: tc.output,
-                    actual: runOutput,
+                    input: tc.input ?? '',
+                    expected: tc.output ?? '',
+                    actual: actualOutput,
+                    stderr: stderr.trim(),
                     passed,
                     isHidden: tc.isHidden,
                 });
             }
 
             setTestResults(results);
-            const passedCount = results.filter(r => r.passed).length;
-            setOutput(`✅ ${passedCount}/${results.length} test cases passed`);
+            setConsoleOutput({ stdout: lastStdout, stderr: lastStderr, hasError: !!lastStderr.trim() });
+            setOutputTab(0); // show test results
         } catch (err) {
-            setOutput('❌ Error: ' + (err?.data?.message || err.message));
-            allPassed = false;
+            const errMsg = err?.data?.message || err.message || 'Compilation/execution failed';
+            setConsoleOutput({ stdout: '', stderr: errMsg, hasError: true });
+            setOutputTab(1);
+            toast.error(errMsg);
         } finally {
             setIsRunning(false);
         }
     };
 
     const handleNext = () => {
-        const passed = testResults.length > 0 && testResults.every((r) => r.passed);
+        const passedCount = testResults.filter(r => r.passed).length;
+        const totalCount = testResults.length || (q.codeQuestion?.testCases?.length || 0);
+        const isAllPassed = passedCount === totalCount && totalCount > 0;
 
         if (saveStudentAnswer) {
-            const answerData = { code, language, isCorrect: passed };
+            const answerData = { 
+                code, 
+                language, 
+                isCorrect: isAllPassed,
+                passedTestCases: passedCount,
+                totalTestCases: totalCount
+            };
             saveStudentAnswer(q._id, answerData);
         }
 
         let status = 'attended';
-        if (testResults.length > 0) {
-            const passedCount = testResults.filter(r => r.passed).length;
-            const totalCount = testResults.length;
-
-            // Check for errors/failures
-            const hasError = testResults.some(r => !r.passed);
-
-            if (passed === true) {
+        if (totalCount > 0) {
+            if (isAllPassed) {
                 status = 'correct'; // Full correct (Green)
-            } else if (passedCount > 0 && passedCount < totalCount) {
+            } else if (passedCount > 0) {
                 status = 'partial'; // Partially correct (Yellow)
             } else {
                 status = 'error'; // Error in code/All Failed (Red)
@@ -177,7 +256,7 @@ public class Solution {
         }
 
         if (onAnswered) onAnswered(currentQuestion, status);
-        if (passed) saveUserTestScore();
+        if (isAllPassed) saveUserTestScore();
 
         if (currentQuestion < questions.length - 1 && setCurrentQuestion) {
             setCurrentQuestion(currentQuestion + 1);
@@ -194,7 +273,7 @@ public class Solution {
     return (
         <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Question Header */}
-            <Paper elevation={3} sx={{ p: 3, borderRadius: 2, background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' }}>
+            <Paper elevation={3} sx={{ p: 3, borderRadius: 2, background: 'linear-gradient(135deg, #1A237E 0%, #0D47A1 100%)' }}>
                 <Typography variant="h5" sx={{ fontWeight: 700, color: 'white', mb: 1 }}>
                     <CodeIcon sx={{ mr: 1, verticalAlign: 'middle' }} />
                     Question {currentQuestion + 1}: Programming Challenge
@@ -209,7 +288,7 @@ public class Solution {
                 <Stack spacing={2}>
                     {/* Input Format */}
                     <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#667eea', mb: 1 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#1A237E', mb: 1 }}>
                             <InputIcon sx={{ fontSize: 20, mr: 0.5, verticalAlign: 'middle' }} />
                             Input Format
                         </Typography>
@@ -222,7 +301,7 @@ public class Solution {
 
                     {/* Output Format */}
                     <Box>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#764ba2', mb: 1 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: '#0D47A1', mb: 1 }}>
                             <OutputIcon sx={{ fontSize: 20, mr: 0.5, verticalAlign: 'middle' }} />
                             Output Format
                         </Typography>
@@ -286,29 +365,39 @@ public class Solution {
             </Paper>
 
             {/* Editor Controls */}
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ px: 1 }}>
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" sx={{ px: 1, gap: 1 }}>
+                {/* Language Selector */}
                 <Select
                     size="small"
                     value={language}
                     onChange={handleLanguageChange}
-                    sx={{
-                        minWidth: 160,
-                        bgcolor: 'white',
-                        fontWeight: 600,
-                        '& .MuiSelect-select': { display: 'flex', alignItems: 'center', gap: 1 },
-                    }}
+                    sx={{ minWidth: 160, bgcolor: 'white', fontWeight: 600 }}
                 >
-                    <MenuItem value="python">
-                        <Box component="span" sx={{ fontSize: '1.2rem' }}>🐍</Box> Python
-                    </MenuItem>
-                    <MenuItem value="javascript">
-                        <Box component="span" sx={{ fontSize: '1.2rem' }}>⚡</Box> JavaScript
-                    </MenuItem>
-                    <MenuItem value="java">
-                        <Box component="span" sx={{ fontSize: '1.2rem' }}>☕</Box> Java
-                    </MenuItem>
+                    <MenuItem value="python">🐍 Python 3</MenuItem>
+                    <MenuItem value="javascript">⚡ JavaScript</MenuItem>
+                    <MenuItem value="java">☕ Java</MenuItem>
+                    <MenuItem value="cpp">⚙️ C++</MenuItem>
+                    <MenuItem value="c">🔩 C</MenuItem>
                 </Select>
 
+                {/* Theme Selector */}
+                <Select
+                    size="small"
+                    value={editorTheme}
+                    onChange={(e) => setEditorTheme(e.target.value)}
+                    sx={{ minWidth: 140 }}
+                >
+                    <MenuItem value="dark">🌙 Dark</MenuItem>
+                    <MenuItem value="light">☀️ Light</MenuItem>
+                </Select>
+
+                <Box sx={{ flex: 1 }} />
+
+                {allTestsPassed && (
+                    <Chip icon={<CheckCircleIcon />} label="All Tests Passed!" color="success" sx={{ fontWeight: 700 }} />
+                )}
+
+                {/* Run Button */}
                 <Button
                     variant="contained"
                     size="large"
@@ -316,357 +405,324 @@ public class Solution {
                     onClick={executeCode}
                     disabled={isRunning}
                     sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        '&:hover': { background: 'linear-gradient(135deg, #5568d3 0%, #653a8a 100%)' },
-                        textTransform: 'none',
-                        fontWeight: 700,
-                        px: 3,
+                        background: 'linear-gradient(135deg, #1A237E 0%, #0D47A1 100%)',
+                        '&:hover': { background: 'linear-gradient(135deg, #0D47A1 0%, #002171 100%)' },
+                        textTransform: 'none', fontWeight: 700, px: 3,
                     }}
                 >
-                    {isRunning ? 'Running...' : 'Run Code'}
+                    {isRunning ? 'Running...' : '▶ Run Code'}
                 </Button>
-
-                <Select
-                    size="small"
-                    value={editorTheme}
-                    onChange={(e) => setEditorTheme(e.target.value)}
-                    sx={{ minWidth: 140 }}
-                >
-                    <MenuItem value="vs-dark">🌙 Dark Theme</MenuItem>
-                    <MenuItem value="light">☀️ Light Theme</MenuItem>
-                    <MenuItem value="hc-black">🔲 High Contrast</MenuItem>
-                </Select>
-
-                <Box sx={{ flex: 1 }} />
-
-                {allTestsPassed && (
-                    <Chip
-                        icon={<CheckCircleIcon />}
-                        label="All Tests Passed!"
-                        color="success"
-                        sx={{ fontWeight: 700, fontSize: '0.9rem', px: 1 }}
-                    />
-                )}
             </Stack>
 
-            {/* Monaco Code Editor */}
+            {/* CodeMirror Editor */}
             <Paper
                 elevation={4}
                 sx={{
                     height: 500,
-                    overflow: 'hidden',
+                    overflow: 'auto',
                     borderRadius: 2,
                     border: '2px solid #e0e0e0',
+                    '& .cm-editor': {
+                        height: '100%',
+                        fontSize: '15px',
+                        fontFamily: "'Fira Code', 'Courier New', monospace",
+                    },
+                    '& .cm-scroller': {
+                        overflow: 'auto'
+                    }
                 }}
             >
-                <Editor
-                    height="500px"
-                    language={language}
+                <CodeMirror
                     value={code}
+                    height="500px"
+                    theme={editorTheme === 'dark' ? vscodeDark : 'light'}
+                    extensions={getLanguageExtension(language)}
                     onChange={handleCodeChange}
-                    theme={editorTheme}
-                    loading={<Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 500 }}><CircularProgress /></Box>}
-                    options={{
-                        minimap: { enabled: true, maxColumn: 50 },
-                        fontSize: 15,
-                        fontFamily: "'Fira Code', 'Courier New', monospace",
-                        fontLigatures: true,
-                        lineNumbers: 'on',
-                        roundedSelection: true,
-                        scrollBeyondLastLine: false,
-                        automaticLayout: true,
-                        tabSize: language === 'python' ? 4 : 2,
-                        insertSpaces: true,
-                        wordWrap: 'on',
-                        bracketPairColorization: { enabled: true },
-                        autoClosingBrackets: 'always',
-                        autoClosingQuotes: 'always',
-                        autoIndent: 'full',
-                        formatOnPaste: true,
-                        formatOnType: true,
-                        suggestOnTriggerCharacters: true,
-                        quickSuggestions: {
-                            other: true,
-                            comments: false,
-                            strings: false,
-                        },
-                        parameterHints: { enabled: true },
-                        folding: true,
-                        foldingStrategy: 'indentation',
-                        showFoldingControls: 'always',
-                        renderLineHighlight: 'all',
-                        cursorBlinking: 'smooth',
-                        cursorSmoothCaretAnimation: 'on',
-                        smoothScrolling: true,
-                        padding: { top: 16, bottom: 16 },
-                        scrollbar: {
-                            vertical: 'visible',
-                            horizontal: 'visible',
-                            useShadows: true,
-                            verticalScrollbarSize: 12,
-                            horizontalScrollbarSize: 12,
-                        },
+                    basicSetup={{
+                        lineNumbers: true,
+                        bracketMatching: true,
+                        highlightActiveLine: true,
+                        closeBrackets: true,
+                        autocompletion: true,
+                        foldGutter: true,
+                        highlightSelectionMatches: true,
                     }}
                 />
             </Paper>
 
-            {/* Output Section - Tabular Test Results */}
-            {output && (
-                <Paper
-                    elevation={3}
-                    sx={{
-                        p: 3,
-                        bgcolor: '#ffffff',
-                        borderRadius: 3,
-                        border: '2px solid #e0e0e0',
-                        maxHeight: 500,
-                        overflow: 'auto',
-                    }}
-                >
-                    {/* Header with Overall Result */}
-                    <Box sx={{
-                        mb: 3,
-                        p: 2.5,
-                        borderRadius: 2,
-                        background: (() => {
-                            const allPassed = testResults.length > 0 && testResults.every(r => r.passed);
-                            const visibleTests = testResults.filter(r => !r.isHidden);
-                            const allVisiblePassed = visibleTests.length > 0 && visibleTests.every(r => r.passed);
-                            const someHiddenFailed = testResults.some(r => r.isHidden && !r.passed);
+            {/* Custom Input (shown when no test cases) */}
+            {(q.codeQuestion?.testCases || []).length === 0 && (
+                <Box>
+                    <Typography variant="subtitle2" fontWeight={700} color="text.secondary" mb={0.75}>
+                        <InputIcon sx={{ fontSize: 16, mr: 0.5, verticalAlign: 'middle' }} />
+                        Custom Input (stdin)
+                    </Typography>
+                    <TextField
+                        multiline
+                        rows={3}
+                        fullWidth
+                        variant="outlined"
+                        placeholder="Enter custom input here (one value per line)..."
+                        value={customInput}
+                        onChange={(e) => setCustomInput(e.target.value)}
+                        sx={{ fontFamily: 'monospace', '& textarea': { fontFamily: 'monospace', fontSize: '0.9rem' } }}
+                    />
+                </Box>
+            )}
 
-                            if (allPassed) {
-                                return 'linear-gradient(135deg, #4caf50 0%, #66bb6a 100%)'; // All pass - Green
-                            } else if (allVisiblePassed && someHiddenFailed) {
-                                return 'linear-gradient(135deg, #ffc107 0%, #ffb300 100%)'; // Visible pass, hidden fail - Yellow
-                            } else {
-                                return 'linear-gradient(135deg, #f44336 0%, #ef5350 100%)'; // Some visible failed - Red
+            {/* Output Section */}
+            {hasRun && (
+                <Paper elevation={0} sx={{ border: '1px solid #e0e0e0', borderRadius: 2, overflow: 'hidden', mt: 1 }}>
+                    {/* Output Header */}
+                    <Box sx={{
+                        px: 3, py: 1.5,
+                        background: (() => {
+                            if (testResults.length > 0) {
+                                const passed = testResults.filter(r => r.passed).length;
+                                if (passed === testResults.length) return '#2e7d32';
+                                if (passed > 0) return '#ed6c02';
+                                return '#c62828';
                             }
+                            return consoleOutput.hasError ? '#c62828' : '#1A237E';
                         })(),
-                        color: 'white',
-                        textAlign: 'center',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                        color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between'
                     }}>
-                        <Typography variant="h5" sx={{ fontWeight: 700, mb: 0.5 }}>
-                            📊 Test Results
+                        <Typography variant="h6" fontWeight={700} fontSize="0.95rem">
+                            {testResults.length > 0
+                                ? `Test Results: ${testResults.filter(r => r.passed).length}/${testResults.length} Passed`
+                                : consoleOutput.hasError ? '❌ Runtime / Compile Error' : '✅ Execution Output'}
                         </Typography>
-                        <Typography variant="h6" sx={{ fontWeight: 600, opacity: 0.95 }}>
-                            {output}
-                        </Typography>
+                        {testResults.length > 0 && (
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                {testResults.every(r => r.passed)
+                                    ? <CheckCircleIcon sx={{ fontSize: 20 }} />
+                                    : <CancelIcon sx={{ fontSize: 20 }} />}
+                            </Stack>
+                        )}
                     </Box>
 
-                    {/* Test Cases Table */}
-                    <Stack spacing={2.5}>
-                        {testResults.map((res, i) => {
-                            const testCaseNum = i + 1;
-                            const bgColor = res.passed
-                                ? 'rgba(76, 175, 80, 0.08)'
-                                : 'rgba(244, 67, 54, 0.08)';
-                            const borderColor = res.passed ? '#4caf50' : '#f44336';
+                    {/* Tabs: Test Results | Console */}
+                    {testResults.length > 0 && (
+                        <Box sx={{ borderBottom: '1px solid #e0e0e0' }}>
+                            <Tabs value={outputTab} onChange={(_, v) => setOutputTab(v)} sx={{ px: 2, minHeight: 40 }}>
+                                <Tab label="Test Results" sx={{ fontWeight: 700, fontSize: '0.85rem', minHeight: 40 }} />
+                                <Tab label="Console" sx={{ fontWeight: 700, fontSize: '0.85rem', minHeight: 40 }} />
+                            </Tabs>
+                        </Box>
+                    )}
 
-                            return (
-                                <Paper
-                                    key={i}
-                                    elevation={2}
-                                    sx={{
-                                        p: 2.5,
-                                        bgcolor: bgColor,
-                                        border: `2px solid ${borderColor}`,
-                                        borderRadius: 2,
-                                        transition: 'all 0.3s ease',
-                                        '&:hover': {
-                                            boxShadow: `0 6px 20px ${res.passed ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)'}`,
-                                            transform: 'translateY(-2px)',
-                                        }
-                                    }}
-                                >
-                                    {/* Test Case Header */}
-                                    <Box sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                        mb: 2,
-                                        pb: 1.5,
-                                        borderBottom: `2px solid ${borderColor}`,
-                                    }}>
-                                        <Typography variant="h6" sx={{
-                                            fontWeight: 700,
-                                            color: borderColor,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            gap: 1,
-                                        }}>
-                                            {res.passed ? '✅' : '❌'}
-                                            Test Case {testCaseNum}
-                                            {res.isHidden && (
-                                                <Chip
-                                                    label="Hidden"
-                                                    size="small"
-                                                    sx={{
-                                                        bgcolor: 'rgba(0,0,0,0.1)',
-                                                        color: borderColor,
-                                                        fontWeight: 600,
-                                                        fontSize: '0.7rem',
-                                                    }}
-                                                />
-                                            )}
-                                        </Typography>
-                                        <Chip
-                                            label={res.passed ? 'PASSED' : 'FAILED'}
-                                            sx={{
-                                                bgcolor: borderColor,
-                                                color: 'white',
-                                                fontWeight: 700,
-                                                fontSize: '0.85rem',
-                                                px: 1,
-                                            }}
-                                        />
+                    {/* Test Results Table */}
+                    {outputTab === 0 && testResults.length > 0 && (() => {
+                        const BORDER = '1.5px solid #111';
+                        const HD_BG = '#1A237E';
+
+                        // ── Row theme per result type ──────────────────────────
+                        // passed            → full green
+                        // hidden + failed   → amber / dark-yellow
+                        // visible + failed  → red
+                        const getRowTheme = (res) => {
+                            if (res.passed) return {
+                                rowBg: '#e8f5e9',          // soft green wash
+                                borderColor: '#66bb6a',
+                                textColor: '#1b5e20',
+                                pillBg: '#c8e6c9',
+                                pillBorder: '#81c784',
+                                iconColor: '#2e7d32',
+                                badgeBg: '#a5d6a7',
+                                badgeBorder: '#388e3c',
+                                badgeColor: '#1b5e20',
+                            };
+                            if (res.isHidden) return {
+                                rowBg: '#fff8e1',          // amber / dark-yellow wash
+                                borderColor: '#ffb300',
+                                textColor: '#e65100',
+                                pillBg: '#ffecb3',
+                                pillBorder: '#ffd54f',
+                                iconColor: '#f57c00',
+                                badgeBg: '#ffe082',
+                                badgeBorder: '#ffb300',
+                                badgeColor: '#e65100',
+                            };
+                            return {
+                                rowBg: '#ffebee',          // red wash
+                                borderColor: '#ef9a9a',
+                                textColor: '#b71c1c',
+                                pillBg: '#ffcdd2',
+                                pillBorder: '#ef9a9a',
+                                iconColor: '#c62828',
+                                badgeBg: '#ef9a9a',
+                                badgeBorder: '#c62828',
+                                badgeColor: '#b71c1c',
+                            };
+                        };
+
+                        const cellBase = (theme) => ({
+                            border: `1.5px solid ${theme.borderColor}`,
+                            py: 1.5,
+                            px: 2,
+                            verticalAlign: 'middle',
+                            bgcolor: theme.rowBg,
+                        });
+
+                        const valuePill = (theme, extra = {}) => ({
+                            fontFamily: 'monospace',
+                            fontSize: '0.88rem',
+                            fontWeight: 600,
+                            color: theme.textColor,
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word',
+                            bgcolor: theme.pillBg,
+                            px: 1.5,
+                            py: 0.75,
+                            borderRadius: 1,
+                            border: `1px solid ${theme.pillBorder}`,
+                            ...extra,
+                        });
+
+                        const sorted = [...testResults].sort((a, b) =>
+                            a.isHidden === b.isHidden ? 0 : a.isHidden ? 1 : -1
+                        );
+
+                        return (
+                            <TableContainer sx={{ border: `1.5px solid #111`, borderTop: 'none' }}>
+                                <Table sx={{ tableLayout: 'fixed', minWidth: 520, borderCollapse: 'collapse' }}>
+
+                                    {/* ── Header ── */}
+                                    <TableHead>
+                                        <TableRow sx={{ bgcolor: HD_BG }}>
+                                            {['Status', 'Input', 'Expected Output', 'Your Output'].map((h, hi) => (
+                                                <TableCell key={h} sx={{
+                                                    border: '1.5px solid #3949ab',
+                                                    py: 1.5, px: 2,
+                                                    color: '#fff',
+                                                    fontWeight: 800,
+                                                    fontSize: '0.82rem',
+                                                    letterSpacing: '0.06em',
+                                                    textTransform: 'uppercase',
+                                                    width: hi === 0 ? 80 : 'auto',
+                                                    textAlign: hi === 0 ? 'center' : 'left',
+                                                }}>
+                                                    {h}
+                                                </TableCell>
+                                            ))}
+                                        </TableRow>
+                                    </TableHead>
+
+                                    {/* ── Rows ── */}
+                                    <TableBody>
+                                        {sorted.map((res, idx) => {
+                                            const th = getRowTheme(res);
+                                            const cb = cellBase(th);
+
+                                            return (
+                                                <TableRow key={idx}>
+
+                                                    {/* Status cell */}
+                                                    <TableCell sx={{ ...cb, textAlign: 'center', width: 80 }}>
+                                                        {res.passed
+                                                            ? <CheckCircleIcon sx={{ color: th.iconColor, fontSize: 30 }} />
+                                                            : <CancelIcon sx={{ color: th.iconColor, fontSize: 30 }} />}
+                                                    </TableCell>
+
+                                                    {res.isHidden ? (
+                                                        /* ── Hidden test case ── */
+                                                        <>
+                                                            {/* Input hidden badge */}
+                                                            <TableCell sx={cb}>
+                                                                <Box sx={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: 0.6,
+                                                                    bgcolor: th.badgeBg, color: th.badgeColor,
+                                                                    px: 1.5, py: 0.5, borderRadius: 1,
+                                                                    border: `1.5px solid ${th.badgeBorder}`,
+                                                                    fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.02em',
+                                                                }}>
+                                                                    🔒 Hidden Input
+                                                                </Box>
+                                                            </TableCell>
+
+                                                            {/* Expected hidden badge */}
+                                                            <TableCell sx={cb}>
+                                                                <Box sx={{
+                                                                    display: 'inline-flex', alignItems: 'center', gap: 0.6,
+                                                                    bgcolor: th.badgeBg, color: th.badgeColor,
+                                                                    px: 1.5, py: 0.5, borderRadius: 1,
+                                                                    border: `1.5px solid ${th.badgeBorder}`,
+                                                                    fontWeight: 800, fontSize: '0.8rem', letterSpacing: '0.02em',
+                                                                }}>
+                                                                    🔒 Hidden Output
+                                                                </Box>
+                                                            </TableCell>
+
+                                                            {/* Your output */}
+                                                            <TableCell sx={cb}>
+                                                                <Box sx={valuePill(th)}>
+                                                                    {res.stderr
+                                                                        ? <Box><ErrorOutlineIcon sx={{ fontSize: 13, mr: 0.5, verticalAlign: 'middle' }} />{res.stderr.slice(0, 200)}</Box>
+                                                                        : (res.actual || <em style={{ opacity: 0.5 }}>no output</em>)}
+                                                                </Box>
+                                                            </TableCell>
+                                                        </>
+                                                    ) : (
+                                                        /* ── Visible test case ── */
+                                                        <>
+                                                            {/* Input */}
+                                                            <TableCell sx={cb}>
+                                                                <Box sx={valuePill(th)}>
+                                                                    {res.input || <em style={{ opacity: 0.5 }}>empty</em>}
+                                                                </Box>
+                                                            </TableCell>
+
+                                                            {/* Expected */}
+                                                            <TableCell sx={cb}>
+                                                                <Box sx={valuePill(th)}>
+                                                                    {res.expected || <em style={{ opacity: 0.5 }}>empty</em>}
+                                                                </Box>
+                                                            </TableCell>
+
+                                                            {/* Your output */}
+                                                            <TableCell sx={cb}>
+                                                                <Box sx={valuePill(th, { fontWeight: 700 })}>
+                                                                    {res.stderr
+                                                                        ? <Box><ErrorOutlineIcon sx={{ fontSize: 13, mr: 0.5, verticalAlign: 'middle' }} />{res.stderr.slice(0, 200)}</Box>
+                                                                        : (res.actual || <em style={{ opacity: 0.5 }}>no output</em>)}
+                                                                </Box>
+                                                            </TableCell>
+                                                        </>
+                                                    )}
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            </TableContainer>
+                        );
+                    })()}
+
+
+                    {/* Console / raw output */}
+                    {(outputTab === 1 || testResults.length === 0) && (
+                        <Box sx={{ p: 2.5 }}>
+                            {consoleOutput.stdout && (
+                                <Box mb={consoleOutput.stderr ? 2 : 0}>
+                                    <Typography variant="caption" fontWeight={700} color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>STDOUT</Typography>
+                                    <Box sx={{ p: 2, bgcolor: '#111827', borderRadius: 1.5, fontFamily: 'monospace', fontSize: '0.88rem', color: '#a5f3a5', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 220, overflow: 'auto' }}>
+                                        {consoleOutput.stdout}
                                     </Box>
-
-                                    {/* Test Case Details - Only show for visible tests */}
-                                    {!res.isHidden && (
-                                        <Box sx={{
-                                            display: 'grid',
-                                            gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-                                            gap: 2,
-                                        }}>
-                                            {/* Input Box */}
-                                            <Paper
-                                                elevation={0}
-                                                sx={{
-                                                    p: 2,
-                                                    bgcolor: 'white',
-                                                    border: '2px solid #2196f3',
-                                                    borderRadius: 2,
-                                                }}
-                                            >
-                                                <Typography
-                                                    variant="subtitle2"
-                                                    sx={{
-                                                        fontWeight: 700,
-                                                        color: '#2196f3',
-                                                        mb: 1,
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        fontSize: '0.75rem',
-                                                    }}
-                                                >
-                                                    📥 Input
-                                                </Typography>
-                                                <Typography
-                                                    sx={{
-                                                        fontFamily: 'monospace',
-                                                        fontSize: '0.9rem',
-                                                        color: '#37474f',
-                                                        whiteSpace: 'pre-wrap',
-                                                        wordBreak: 'break-word',
-                                                        minHeight: '40px',
-                                                        p: 1,
-                                                        bgcolor: '#f5f5f5',
-                                                        borderRadius: 1,
-                                                    }}
-                                                >
-                                                    {res.input || '(empty)'}
-                                                </Typography>
-                                            </Paper>
-
-                                            {/* Expected Output Box */}
-                                            <Paper
-                                                elevation={0}
-                                                sx={{
-                                                    p: 2,
-                                                    bgcolor: 'white',
-                                                    border: '2px solid #4caf50',
-                                                    borderRadius: 2,
-                                                }}
-                                            >
-                                                <Typography
-                                                    variant="subtitle2"
-                                                    sx={{
-                                                        fontWeight: 700,
-                                                        color: '#4caf50',
-                                                        mb: 1,
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        fontSize: '0.75rem',
-                                                    }}
-                                                >
-                                                    ✓ Expected
-                                                </Typography>
-                                                <Typography
-                                                    sx={{
-                                                        fontFamily: 'monospace',
-                                                        fontSize: '0.9rem',
-                                                        color: '#37474f',
-                                                        whiteSpace: 'pre-wrap',
-                                                        wordBreak: 'break-word',
-                                                        minHeight: '40px',
-                                                        p: 1,
-                                                        bgcolor: '#f5f5f5',
-                                                        borderRadius: 1,
-                                                    }}
-                                                >
-                                                    {res.expected || '(empty)'}
-                                                </Typography>
-                                            </Paper>
-
-                                            {/* Actual Output Box */}
-                                            <Paper
-                                                elevation={0}
-                                                sx={{
-                                                    p: 2,
-                                                    bgcolor: 'white',
-                                                    border: `2px solid ${res.passed ? '#4caf50' : '#f44336'}`,
-                                                    borderRadius: 2,
-                                                }}
-                                            >
-                                                <Typography
-                                                    variant="subtitle2"
-                                                    sx={{
-                                                        fontWeight: 700,
-                                                        color: res.passed ? '#4caf50' : '#f44336',
-                                                        mb: 1,
-                                                        textTransform: 'uppercase',
-                                                        letterSpacing: '0.5px',
-                                                        fontSize: '0.75rem',
-                                                    }}
-                                                >
-                                                    📤 Output
-                                                </Typography>
-                                                <Typography
-                                                    sx={{
-                                                        fontFamily: 'monospace',
-                                                        fontSize: '0.9rem',
-                                                        color: '#37474f',
-                                                        whiteSpace: 'pre-wrap',
-                                                        wordBreak: 'break-word',
-                                                        minHeight: '40px',
-                                                        p: 1,
-                                                        bgcolor: '#f5f5f5',
-                                                        borderRadius: 1,
-                                                    }}
-                                                >
-                                                    {res.actual || '(empty)'}
-                                                </Typography>
-                                            </Paper>
-                                        </Box>
-                                    )}
-
-                                    {/* Hidden Test Case Message */}
-                                    {res.isHidden && (
-                                        <Box sx={{
-                                            textAlign: 'center',
-                                            py: 2,
-                                            opacity: 0.7,
-                                        }}>
-                                            <Typography variant="body2" sx={{ fontStyle: 'italic', color: '#666' }}>
-                                                🔒 Test case details are hidden for evaluation
-                                            </Typography>
-                                        </Box>
-                                    )}
-                                </Paper>
-                            );
-                        })}
-                    </Stack>
+                                </Box>
+                            )}
+                            {consoleOutput.stderr && (
+                                <Box>
+                                    <Typography variant="caption" fontWeight={700} color="error.main" sx={{ display: 'block', mb: 0.5 }}>STDERR / ERROR</Typography>
+                                    <Box sx={{ p: 2, bgcolor: '#1a0000', borderRadius: 1.5, fontFamily: 'monospace', fontSize: '0.88rem', color: '#ff8a8a', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 220, overflow: 'auto' }}>
+                                        {consoleOutput.stderr}
+                                    </Box>
+                                </Box>
+                            )}
+                            {!consoleOutput.stdout && !consoleOutput.stderr && (
+                                <Typography variant="body2" color="text.disabled" fontStyle="italic">No output produced.</Typography>
+                            )}
+                        </Box>
+                    )}
                 </Paper>
             )}
 
@@ -678,8 +734,8 @@ public class Solution {
                     endIcon={<NavigateNextIcon />}
                     onClick={handleNext}
                     sx={{
-                        background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                        '&:hover': { background: 'linear-gradient(135deg, #5568d3 0%, #653a8a 100%)' },
+                        background: 'linear-gradient(135deg, #1A237E 0%, #0D47A1 100%)',
+                        '&:hover': { background: 'linear-gradient(135deg, #0D47A1 0%, #002171 100%)' },
                         textTransform: 'none',
                         fontWeight: 700,
                         px: 5,
@@ -693,3 +749,4 @@ public class Solution {
         </Box>
     );
 }
+

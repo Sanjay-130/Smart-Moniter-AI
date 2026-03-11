@@ -1,5 +1,6 @@
 import Result from '../models/resultModel.js';
 import Exam from '../models/examModel.js';
+import Question from '../models/quesModel.js';
 import asyncHandler from 'express-async-handler';
 
 // @desc    Save exam result
@@ -9,21 +10,32 @@ export const saveResult = asyncHandler(async (req, res) => {
   const { examId, answers, timeTaken } = req.body;
   const studentId = req.user._id;
 
-  // Get the exam with questions
-  const exam = await Exam.findById(examId).populate('questions');
+  // Get the exam
+  const exam = await Exam.findById(examId);
 
   if (!exam) {
     res.status(404);
     throw new Error('Exam not found');
   }
 
+  // Get relevant questions
+  const examQuestions = await Question.find({ examId: examId });
+
   // Calculate score and prepare result
-  let correctAnswers = 0;
+  let totalScore = 0;
+  let maxPossibleScore = 0;
   const resultDetails = [];
 
-  exam.questions.forEach(question => {
-    const studentAnswer = answers.find(a => a.questionId === question._id.toString());
+  examQuestions.forEach(question => {
+    const qMarks = question.marks || 1;
+    maxPossibleScore += qMarks;
+    const qIdStr = question._id.toString();
+    const studentAnswer = answers.find(a => String(a.questionId) === qIdStr);
+    
     let isCorrect = false;
+    let earnedMarks = 0;
+    let passedTestCases = 0;
+    let totalTestCases = 0;
     let resultDetail = {
       questionId: question._id,
       isCorrect: false
@@ -33,29 +45,37 @@ export const saveResult = asyncHandler(async (req, res) => {
       if (studentAnswer) {
         resultDetail.codeAnswer = studentAnswer.codeAnswer || '';
         resultDetail.language = studentAnswer.language || '';
-        // Trust the frontend execution result for now
-        isCorrect = !!studentAnswer.isCorrect;
+        passedTestCases = studentAnswer.passedTestCases || 0;
+        totalTestCases = studentAnswer.totalTestCases || (question.codeQuestion?.testCases?.length || 0);
+        
+        if (totalTestCases > 0) {
+          earnedMarks = (passedTestCases / totalTestCases) * qMarks;
+          isCorrect = passedTestCases === totalTestCases;
+        } else {
+          isCorrect = !!studentAnswer.isCorrect;
+          if (isCorrect) earnedMarks = qMarks;
+        }
+        
+        resultDetail.passedTestCases = passedTestCases;
+        resultDetail.totalTestCases = totalTestCases;
       }
     } else {
       // MCQ Logic
-      // Find the correct option from the question options
       const correctOpt = question.options && question.options.find(opt => opt.isCorrect);
-      // Compare selectedOption (ID) with correct option ID
       if (studentAnswer && correctOpt) {
-        // selectedOption is expected to be option ID string
-        isCorrect = studentAnswer.selectedOption === correctOpt._id.toString();
+        isCorrect = String(studentAnswer.selectedOption) === correctOpt._id.toString();
+        if (isCorrect) earnedMarks = qMarks;
       }
       resultDetail.selectedOption = studentAnswer ? studentAnswer.selectedOption : 'Not answered';
     }
 
     resultDetail.isCorrect = isCorrect;
-    if (isCorrect) correctAnswers++;
-
+    totalScore += earnedMarks;
     resultDetails.push(resultDetail);
   });
 
-  const percentage = (correctAnswers / exam.questions.length) * 100;
-  const status = percentage >= 60 ? 'Passed' : 'Failed';
+  const percentage = maxPossibleScore > 0 ? (totalScore / maxPossibleScore) * 100 : 0;
+  const status = percentage >= 50 ? 'Passed' : 'Failed';
 
   // Create or update the result
   const result = await Result.findOneAndUpdate(
@@ -64,7 +84,8 @@ export const saveResult = asyncHandler(async (req, res) => {
       student: studentId,
       exam: examId,
       answers: resultDetails,
-      score: correctAnswers,
+      score: totalScore,
+      maxScore: maxPossibleScore,
       totalQuestions: exam.questions.length,
       percentage,
       timeTaken,

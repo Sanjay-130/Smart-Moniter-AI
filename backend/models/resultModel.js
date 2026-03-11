@@ -30,6 +30,14 @@ const resultSchema = new mongoose.Schema(
         language: {
           type: String
         },
+        passedTestCases: {
+          type: Number,
+          default: 0
+        },
+        totalTestCases: {
+          type: Number,
+          default: 0
+        },
         isCorrect: {
           type: Boolean,
           required: true

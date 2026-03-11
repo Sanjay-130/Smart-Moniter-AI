@@ -78,7 +78,7 @@ const LoginTeacher = () => {
           }}
         >
           <Grid item xs={12} sm={12} lg={4} xl={3} display="flex" justifyContent="center" alignItems="center">
-            <Card elevation={6} sx={{ p: { xs: 3, sm: 4 }, zIndex: 1, width: '100%', maxWidth: '520px', borderRadius: 4, background: '#FFFFFF' }}>
+            <Card elevation={6} sx={{ p: { xs: 3, sm: 4 }, zIndex: 1, width: '100%', maxWidth: '520px', borderRadius: 0, background: '#FFFFFF' }}>
               <Box display="flex" justifyContent="flex-start" mb={1}>
                 <Button
                   component={Link}

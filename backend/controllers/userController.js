@@ -140,10 +140,11 @@ const getStudentHistory = asyncHandler(async (req, res) => {
       acc.multipleFaceCount += l.multipleFaceCount || 0;
       acc.cellPhoneCount += l.cellPhoneCount || 0;
       acc.prohibitedObjectCount += l.prohibitedObjectCount || 0;
+      acc.leaningBackCount += l.leaningBackCount || 0;
       acc.events += 1;
       return acc;
     },
-    { noFaceCount: 0, multipleFaceCount: 0, cellPhoneCount: 0, prohibitedObjectCount: 0, events: 0 }
+    { noFaceCount: 0, multipleFaceCount: 0, cellPhoneCount: 0, prohibitedObjectCount: 0, leaningBackCount: 0, events: 0 }
   );
 
   res.status(200).json({
@@ -301,7 +302,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
     user.dob = req.body.dob || user.dob;
-    user.profilePic = req.body.profilePic || user.profilePic;
+    user.profilePic = req.body.profilePic !== undefined ? req.body.profilePic : user.profilePic;
     // allow updating rollNumber but ensure uniqueness
     if (req.body.rollNumber && req.body.rollNumber !== user.rollNumber) {
       const exists = await User.findOne({ rollNumber: req.body.rollNumber });
@@ -532,6 +533,71 @@ const resetPassword = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Password reset successful. You can now login with your new password.' });
 });
 
+// Admin: Bulk register users (from CSV or manual list)
+const bulkRegister = asyncHandler(async (req, res) => {
+  const { users } = req.body;
+
+  if (!Array.isArray(users) || users.length === 0) {
+    res.status(400);
+    throw new Error('Please provide an array of users');
+  }
+
+  const results = {
+    success: [],
+    errors: [],
+  };
+
+  for (const userData of users) {
+    const { name, email, password, role, rollNumber, dob } = userData;
+
+    try {
+      // Basic validation
+      if (!name || !password || !role) {
+        throw new Error(`Missing required fields for user: ${name || 'Unknown'}`);
+      }
+
+      if (role === 'student' && !rollNumber) {
+        throw new Error(`Roll number is required for student: ${name}`);
+      }
+
+      if (role === 'teacher' && !email) {
+        throw new Error(`Email is required for teacher: ${name}`);
+      }
+
+      // Check existence
+      if (rollNumber) {
+        const exist = await User.findOne({ rollNumber });
+        if (exist) throw new Error(`User with roll number ${rollNumber} already exists`);
+      }
+
+      if (email) {
+        const exist = await User.findOne({ email });
+        if (exist) throw new Error(`User with email ${email} already exists`);
+      }
+
+      // Create user
+      const user = await User.create({
+        name,
+        email,
+        password,
+        role,
+        rollNumber,
+        dob,
+        profilePic: userData.profilePic || '',
+      });
+
+      results.success.push({ name: user.name, role: user.role });
+    } catch (err) {
+      results.errors.push({ name: userData.name || 'Unknown', error: err.message });
+    }
+  }
+
+  res.status(201).json({
+    message: `Processed ${users.length} users. Success: ${results.success.length}, Errors: ${results.errors.length}`,
+    ...results,
+  });
+});
+
 export {
   authUser,
   registerUser,
@@ -546,4 +612,5 @@ export {
   getStudentHistory,
   forgotPassword,
   resetPassword,
+  bulkRegister,
 };

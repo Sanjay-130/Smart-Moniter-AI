@@ -99,23 +99,28 @@ const MyResultsPage = () => {
       .map((r) => {
         const examName = r.exam?.examName || r.examName || 'Unnamed Exam';
         const categoryName = r.exam?.category?.name || r.examCategoryName || r.category?.name || 'Uncategorized';
-        const total = Number(r.totalQuestions ?? r.examTotalQuestions ?? 0);
+        const totalQuestions = Number(r.totalQuestions ?? r.examTotalQuestions ?? 0);
         const score = Number(r.score ?? 0);
+        // Use maxScore (sum of all question marks) as the denominator for correct percentage
+        const maxScore = Number(r.maxScore ?? 0) || totalQuestions;
         const percentage = typeof r.percentage === 'number' && !Number.isNaN(r.percentage)
           ? r.percentage
-          : total > 0
-            ? (score / total) * 100
+          : maxScore > 0
+            ? (score / maxScore) * 100
             : 0;
-        const status = r.status || (percentage >= 60 ? 'Passed' : 'Failed');
+        // Normalize percentage to out-of-100
+        const displayPercentage = Math.min(100, Math.max(0, parseFloat(percentage.toFixed(1))));
+        const status = r.status || (displayPercentage >= 50 ? 'Passed' : 'Failed');
         const date = r.submittedAt || r.updatedAt || r.createdAt || null;
 
         return {
           ...r,
           examName,
           examCategoryName: categoryName,
-          totalQuestions: total,
+          totalQuestions,
+          maxScore,
           score,
-          percentage,
+          percentage: displayPercentage,
           status,
           date,
         };
@@ -224,10 +229,13 @@ const MyResultsPage = () => {
                             </TableCell>
                             <TableCell align="center">
                               <Box display="flex" flexDirection="column" alignItems="center">
-                                <Typography variant="body2">
-                                  {result.score} / {result.maxScore || result.totalQuestions} ({result.percentage}%)
+                                <Typography variant="body2" fontWeight={600}>
+                                  {Number.isInteger(result.score) ? result.score : result.score.toFixed(1)} / {result.maxScore} marks
                                 </Typography>
-                                <Box width={60} mt={0.5}>
+                                <Typography variant="caption" color="textSecondary">
+                                  {result.percentage}% out of 100
+                                </Typography>
+                                <Box width={80} mt={0.5}>
                                   <LinearProgress
                                     variant="determinate"
                                     value={result.percentage || 0}

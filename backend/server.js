@@ -13,6 +13,7 @@ import assignmentRoutes from "./routes/assignmentRoutes.js";
 import resultRoutes from "./routes/resultRoutes.js";
 import submitExamRoutes from "./routes/submitExamRoutes.js";
 import compileRoutes from "./routes/compileRoutes.js";
+import taskRoutes from "./routes/taskRoutes.js";
 
 dotenv.config();
 connectDB();
@@ -69,6 +70,7 @@ app.use("/api/assignments", assignmentRoutes);
 app.use("/api/results", resultRoutes);
 app.use("/api/submission", submitExamRoutes);
 app.use("/api/compile", compileRoutes);
+app.use("/api/tasks", taskRoutes);
 
 // we we are deploying this in production
 // make frontend build then
@@ -93,8 +95,26 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Server
-app.listen(port, () => {
+app.listen(port, async () => {
   console.log(`server is running on http://localhost:${port}`);
+
+  // Seed default admin if not exists
+  try {
+    const User = (await import("./models/userModel.js")).default;
+    const adminExists = await User.findOne({ role: 'admin' });
+    if (!adminExists) {
+      console.log('Seeding default admin user...');
+      await User.create({
+        name: 'System Admin',
+        email: 'admin@collage.com',
+        password: 'admin123',
+        role: 'admin'
+      });
+      console.log('Default admin created successfully.');
+    }
+  } catch (error) {
+    console.error('Error seeding admin user:', error);
+  }
 });
 
 // Todos:

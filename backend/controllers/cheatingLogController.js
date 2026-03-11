@@ -12,6 +12,7 @@ const saveCheatingLog = asyncHandler(async (req, res) => {
     multipleFaceCount,
     cellPhoneCount,
     prohibitedObjectCount,
+    leaningBackCount,
     examId,
     username,
     email,
@@ -36,6 +37,7 @@ const saveCheatingLog = asyncHandler(async (req, res) => {
     multipleFaceCount,
     cellPhoneCount,
     prohibitedObjectCount,
+    leaningBackCount,
     examId,
     username,
     email,
@@ -56,8 +58,8 @@ const saveCheatingLog = asyncHandler(async (req, res) => {
 
     if (targetUser && targetUser.role === 'student') {
       targetUser.malpracticeCount = (targetUser.malpracticeCount || 0) + 1;
-      // Block if more than 3 malpractice incidents recorded
-      if (targetUser.malpracticeCount > 3) {
+      // Block if more than 2 malpractice incidents recorded
+      if (targetUser.malpracticeCount > 2) {
         targetUser.isBlocked = true;
       }
       await targetUser.save();
@@ -140,8 +142,8 @@ const deleteCheatingLog = asyncHandler(async (req, res) => {
         const current = Number(user.malpracticeCount || 0);
         const next = Math.max(0, current - 1);
         user.malpracticeCount = next;
-        // If count drops below the blocking threshold (<= 3), ensure the student is unblocked
-        if (next <= 3 && user.isBlocked) {
+        // If count drops below the blocking threshold (<= 2), ensure the student is unblocked
+        if (next <= 2 && user.isBlocked) {
           user.isBlocked = false;
         }
         await user.save();
@@ -155,4 +157,21 @@ const deleteCheatingLog = asyncHandler(async (req, res) => {
   res.status(200).json({ message: 'Cheating log deleted', id });
 });
 
-export { saveCheatingLog, getCheatingLogsByExamId, deleteCheatingLog };
+// @desc Get current student's own cheating logs
+// @route GET /api/exams/my-cheatingLogs
+// @access Private/Student
+const getMyCheatingLogs = asyncHandler(async (req, res) => {
+  const email = req.user.email;
+  const cheatingLogs = await CheatingLog.find({ email }).sort({ createdAt: -1 });
+  res.status(200).json(cheatingLogs);
+});
+
+// @desc Get all cheating logs (Admin/Teacher)
+// @route GET /api/exams/cheatingLogs/all
+// @access Private
+const getAllCheatingLogs = asyncHandler(async (req, res) => {
+  const logs = await CheatingLog.find({}).sort({ createdAt: -1 }).limit(100);
+  res.status(200).json(logs);
+});
+
+export { saveCheatingLog, getCheatingLogsByExamId, deleteCheatingLog, getMyCheatingLogs, getAllCheatingLogs };

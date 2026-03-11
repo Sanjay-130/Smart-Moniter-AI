@@ -60,7 +60,20 @@ const NumberOfQuestions = ({ questionLength, submitTest, examDurationInSeconds, 
           <Typography variant="h6" color="primary.main">
             {Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, '0')}
           </Typography>
-          <Button variant="contained" onClick={submitTest} color="error" size="small">
+          <Button
+            variant="contained"
+            onClick={submitTest}
+            size="small"
+            sx={{
+              background: 'linear-gradient(135deg, #d32f2f 0%, #c62828 100%)', // Keep red for finish/danger actions but consistent style
+              boxShadow: '0 2px 8px rgba(211, 47, 47, 0.3)',
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                background: 'linear-gradient(135deg, #c62828 0%, #b71c1c 100%)',
+              }
+            }}
+          >
             Finish Test
           </Button>
         </Stack>
@@ -81,7 +94,7 @@ const NumberOfQuestions = ({ questionLength, submitTest, examDurationInSeconds, 
                   let border = '1px solid #e0e0e0';
 
                   if (isCurrent) {
-                    bg = '#5d87ff'; // Current active question (Blue)
+                    bg = '#1A237E'; // Current active question (Deep Blue Theme)
                     color = '#fff';
                     border = 'none';
                   } else if (status === 'correct') {
@@ -122,7 +135,7 @@ const NumberOfQuestions = ({ questionLength, submitTest, examDurationInSeconds, 
                         fontWeight: 600,
                         transition: 'all 0.2s ease',
                         '&:hover': {
-                          bgcolor: isCurrent ? '#4570ea' : '#f5f7fa',
+                          bgcolor: isCurrent ? '#0D47A1' : '#f5f7fa',
                           transform: 'translateY(-2px)'
                         },
                       }}

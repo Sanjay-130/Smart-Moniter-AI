@@ -119,11 +119,35 @@ export const userApiSlice = apiSlice.injectEndpoints({
         body: data,
       }),
     }),
+    bulkRegister: builder.mutation({
+      query: (data) => ({
+        url: `${USERS_URL}/bulk-register`,
+        method: 'POST',
+        body: data, // { users: [...] }
+      }),
+      invalidatesTags: ['Users'],
+    }),
   }),
 });
 
 // it specify convention to export them
 // like for mutation we have to add use + name + Mutation
 // like for query we have to add use + name + query
-export const { useLoginMutation, useLogoutMutation, useRegisterMutation, useUpdateUserMutation, useGetProfileQuery, useUnblockUserMutation, useBlockUserMutation, useGetAllUsersQuery, useDeleteUserMutation, useGetStudentByIdentifierQuery, useLazyGetStudentByIdentifierQuery, useGetStudentHistoryQuery, useLazyGetStudentHistoryQuery, useForgotPasswordMutation, useResetPasswordMutation } =
-  userApiSlice;
+export const {
+  useLoginMutation,
+  useLogoutMutation,
+  useRegisterMutation,
+  useUpdateUserMutation,
+  useGetProfileQuery,
+  useUnblockUserMutation,
+  useBlockUserMutation,
+  useGetAllUsersQuery,
+  useDeleteUserMutation,
+  useGetStudentByIdentifierQuery,
+  useLazyGetStudentByIdentifierQuery,
+  useGetStudentHistoryQuery,
+  useLazyGetStudentHistoryQuery,
+  useForgotPasswordMutation,
+  useResetPasswordMutation,
+  useBulkRegisterMutation,
+} = userApiSlice;

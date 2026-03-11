@@ -23,6 +23,9 @@ import Profile from './Profile';
 import { IconBellRinging, IconMenu } from '@tabler/icons-react';
 import { useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
+import TaskNotificationDialog from 'src/components/shared/TaskNotificationDialog';
+import { useGetMyTasksQuery } from 'src/slices/tasksApiSlice';
+import { useState } from 'react';
 
 const Header = (props) => {
   // const lgUp = useMediaQuery((theme) => theme.breakpoints.up('lg'));
@@ -46,51 +49,72 @@ const Header = (props) => {
   }));
 
   const navigate = useNavigate();
+  const [openTaskDialog, setOpenTaskDialog] = useState(false);
+
+  // Poll for tasks if teacher
+  const { data: tasks } = useGetMyTasksQuery(undefined, {
+    pollingInterval: 30000,
+    skip: userInfo?.role !== 'teacher'
+  });
+
+  const unreadCount = tasks?.filter(t => !t.isRead || t.status === 'pending').length || 0;
 
   const handleNotificationClick = () => {
-    navigate('/today');
+    if (userInfo?.role === 'teacher') {
+      setOpenTaskDialog(true);
+    } else {
+      navigate('/today');
+    }
   };
 
   return (
-    <AppBarStyled position="sticky" color="default">
-      <ToolbarStyled>
-        <IconButton
-          color="inherit"
-          aria-label="menu"
-          onClick={props.toggleMobileSidebar}
-          sx={{
-            display: {
-              lg: 'none',
-              xs: 'inline',
-            },
-          }}
-        >
-          <IconMenu width="20" height="20" />
-        </IconButton>
-        <Typography variant="h6" sx={{ fontWeight: 700, ml: 1, color: 'white', letterSpacing: 0.2 }}>
-          SmartMonitor
-        </Typography>
-
-        <IconButton
-          size="large"
-          aria-label="notifications"
-          color="inherit"
-          onClick={handleNotificationClick}
-        >
-          <Badge variant="dot" color="error">
-            <IconBellRinging size="21" stroke="1.5" />
-          </Badge>
-        </IconButton>
-        <Box flexGrow={1} />
-        <Stack spacing={1} direction="row" alignItems="center">
-          <Chip label={_.startCase(userInfo.role || 'user')} sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)' }} size="small" />
-          <Typography variant="body1" color="white" sx={{ fontWeight: 600 }}>
-            Hello, {_.startCase(userInfo.name)}
+    <>
+      <AppBarStyled position="sticky" color="default">
+        <ToolbarStyled>
+          <IconButton
+            color="inherit"
+            aria-label="menu"
+            onClick={props.toggleMobileSidebar}
+            sx={{
+              display: {
+                lg: 'none',
+                xs: 'inline',
+              },
+            }}
+          >
+            <IconMenu width="20" height="20" />
+          </IconButton>
+          <Typography variant="h6" sx={{ fontWeight: 700, ml: 1, color: 'white', letterSpacing: 0.2 }}>
+            SmartMonitor
           </Typography>
-          <Profile />
-        </Stack>
-      </ToolbarStyled>
-    </AppBarStyled >
+
+          <IconButton
+            size="large"
+            aria-label="notifications"
+            color="inherit"
+            onClick={handleNotificationClick}
+          >
+            <Badge variant={unreadCount > 0 ? "dot" : "standard"} badgeContent={unreadCount > 0 ? "" : 0} color="error" invisible={unreadCount === 0}>
+              <IconBellRinging size="21" stroke="1.5" />
+            </Badge>
+          </IconButton>
+
+          <Box flexGrow={1} />
+          <Stack spacing={1} direction="row" alignItems="center">
+            <Chip label={_.startCase(userInfo?.role || 'user')} sx={{ bgcolor: 'rgba(255,255,255,0.15)', color: 'white', fontWeight: 600, border: '1px solid rgba(255,255,255,0.3)' }} size="small" />
+            <Typography variant="body1" color="white" sx={{ fontWeight: 600 }}>
+              Hello, {_.startCase(userInfo?.name || 'Guest')}
+            </Typography>
+            <Profile />
+          </Stack>
+        </ToolbarStyled>
+      </AppBarStyled >
+      {
+        openTaskDialog && (
+          <TaskNotificationDialog open={openTaskDialog} onClose={() => setOpenTaskDialog(false)} />
+        )
+      }
+    </>
   );
 };
 

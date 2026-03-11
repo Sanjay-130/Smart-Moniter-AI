@@ -145,6 +145,14 @@ const ExamDetailsView = () => {
                   {exam.duration} Minutes
                 </Typography>
               </Stack>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Avatar sx={{ width: 32, height: 32, bgcolor: 'rgba(255,255,255,0.2)', color: 'white' }}>
+                  <IconPointFilled size={18} />
+                </Avatar>
+                <Typography variant="subtitle1" fontWeight={700}>
+                  {questions?.reduce((sum, q) => sum + (q.marks ?? 1), 0) || 0} Total Marks
+                </Typography>
+              </Stack>
             </Stack>
           </Box>
 

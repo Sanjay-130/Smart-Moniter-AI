@@ -334,13 +334,34 @@ const AddQuestionForm = () => {
       {/* Session Summary */}
       {questions.length > 0 && (
         <Paper sx={{ p: 3, bgcolor: '#f1f4fb', border: '1px solid', borderColor: 'primary.light' }}>
-          <SectionHeader icon={IconListDetails} title={`Questions Added (${questions.length})`} />
+          <Box display="flex" alignItems="center" justifyContent="space-between" mb={2.5} mt={1}>
+            <Box display="flex" alignItems="center" gap={1.5}>
+              <Box sx={{ bgcolor: 'primary.light', p: 1, borderRadius: 1, display: 'flex', color: 'primary.main' }}>
+                <IconListDetails size={20} />
+              </Box>
+              <Typography variant="h6" fontWeight={700} color="textPrimary">
+                Questions Added ({questions.length})
+              </Typography>
+            </Box>
+            <Chip
+              label={`Total Marks: ${questions.reduce((sum, q) => sum + (q.marks ?? 1), 0)}`}
+              color="primary"
+              variant="filled"
+              sx={{ fontWeight: 700, fontSize: '13px' }}
+            />
+          </Box>
           <Stack spacing={1}>
             {questions.map((q, i) => (
               <Box key={i} sx={{ display: 'flex', alignItems: 'center', p: 1.5, bgcolor: 'white', border: '1px solid', borderColor: 'divider' }}>
                 <Typography variant="body2" sx={{ mr: 2, fontWeight: 700, color: 'primary.main' }}>#{i + 1}</Typography>
                 <Typography variant="body2" noWrap sx={{ flex: 1 }}>{q.question}</Typography>
                 <Chip label={q.questionType} size="small" variant="outlined" sx={{ ml: 1, fontSize: '10px' }} />
+                <Chip
+                  label={`${q.marks ?? 1} mark${(q.marks ?? 1) !== 1 ? 's' : ''}`}
+                  size="small"
+                  color="primary"
+                  sx={{ ml: 1, fontSize: '10px', fontWeight: 700 }}
+                />
               </Box>
             ))}
           </Stack>

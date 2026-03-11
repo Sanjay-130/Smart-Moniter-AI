@@ -34,16 +34,16 @@ const DescriptionAndInstructions = () => {
   const { data: exams } = useGetExamsQuery();
   const exam = exams?.find((e) => e._id === examId);
   const [validateAccess, { isLoading: validating }] = useValidateExamAccessMutation();
-  
+
   const [certify, setCertify] = useState(false);
   const testId = uniqueId();
   const [openPwd, setOpenPwd] = useState(false);
   const [code, setCode] = useState('');
-  
+
   const handleCertifyChange = () => {
     setCertify(!certify);
   };
-  
+
   const handleTest = () => {
     // If exam requires password, prompt first
     if (exam?.accessCode) {
@@ -78,7 +78,7 @@ const DescriptionAndInstructions = () => {
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 1.5 }}>
           <Box sx={{ width: 6, height: 20, bgcolor: 'primary.main', borderRadius: 1, mr: 1 }} />
           <Typography variant="h5" fontWeight={700}>
-          Description
+            Description
           </Typography>
         </Box>
         <Typography variant="body2" color="text.secondary" mb={2}>
@@ -137,7 +137,33 @@ const DescriptionAndInstructions = () => {
             control={<Checkbox checked={certify} onChange={handleCertifyChange} color="primary" />}
             label="I certify that I have carefully read and agree to all of the instructions mentioned above"
           />
-          <Button variant="contained" color="primary" size="small" disabled={!certify} onClick={handleTest}>
+          <Button
+            variant="contained"
+            size="large"
+            disabled={!certify}
+            onClick={handleTest}
+            sx={{
+              background: 'linear-gradient(135deg, #1A237E 0%, #0D47A1 100%)',
+              color: 'white',
+              px: 6,
+              py: 1.2,
+              borderRadius: 2,
+              fontSize: '1rem',
+              fontWeight: 600,
+              textTransform: 'none',
+              boxShadow: '0 4px 12px rgba(26, 35, 126, 0.2)',
+              transition: 'all 0.3s ease',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #0D47A1 0%, #002171 100%)',
+                boxShadow: '0 6px 16px rgba(26, 35, 126, 0.3)',
+                transform: 'translateY(-1px)'
+              },
+              '&.Mui-disabled': {
+                background: '#e0e0e0',
+                color: '#9e9e9e'
+              }
+            }}
+          >
             Start Test
           </Button>
         </Stack>
@@ -155,8 +181,25 @@ const DescriptionAndInstructions = () => {
             />
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setOpenPwd(false)}>Cancel</Button>
-            <Button onClick={submitCode} variant="contained" disabled={validating || !code}>
+            <Button onClick={() => setOpenPwd(false)} sx={{ color: 'text.secondary', fontWeight: 600 }}>Cancel</Button>
+            <Button
+              onClick={submitCode}
+              variant="contained"
+              disabled={validating || !code}
+              sx={{
+                background: 'linear-gradient(135deg, #1A237E 0%, #0D47A1 100%)',
+                px: 4,
+                borderRadius: 1.5,
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #0D47A1 0%, #002171 100%)',
+                },
+                '&.Mui-disabled': {
+                  background: '#e0e0e0',
+                }
+              }}
+            >
               Continue
             </Button>
           </DialogActions>

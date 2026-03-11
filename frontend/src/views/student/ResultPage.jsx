@@ -264,14 +264,14 @@ const ResultPage = () => {
                         p={2}
                       >
                         <Typography variant="h2" fontWeight={700} color="primary">
-                          {result.score}
+                          {Number.isInteger(result.score) ? result.score : result.score.toFixed(1)}
                         </Typography>
                         <Typography variant="body2" color="textSecondary">
-                          out of {result.totalQuestions}
+                          out of {result.maxScore} marks
                         </Typography>
                         <Divider sx={{ width: '100%', my: 1 }} />
                         <Typography variant="h4" fontWeight={600}>
-                          {result.percentage}%
+                          {result.percentage}% / 100
                         </Typography>
                       </Box>
                     </Grid>

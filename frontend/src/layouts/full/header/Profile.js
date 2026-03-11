@@ -40,6 +40,7 @@ const Profile = () => {
   const logoutHandler = async () => {
     try {
       await logoutApiCall().unwrap();
+      localStorage.removeItem('isAdmin');
       dispatch(logout());
       navigate('/auth/login');
     } catch (err) { }
@@ -60,8 +61,8 @@ const Profile = () => {
         onClick={handleClick2}
       >
         <Avatar
-          src={userInfo.profilePic || ProfileImg}
-          alt={userInfo.name}
+          src={userInfo?.profilePic || ProfileImg}
+          alt={userInfo?.name}
           sx={{
             width: 35,
             height: 35,

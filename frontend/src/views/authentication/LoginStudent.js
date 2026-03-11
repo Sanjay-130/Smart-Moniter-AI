@@ -94,7 +94,7 @@ const LoginStudent = () => {
                 zIndex: 1,
                 width: '100%',
                 maxWidth: '520px',
-                borderRadius: 4,
+                borderRadius: 0,
                 background: '#FFFFFF',
               }}
             >

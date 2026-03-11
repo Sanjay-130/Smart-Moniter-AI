@@ -10,6 +10,8 @@ import {
   getCheatingLogsByExamId,
   saveCheatingLog,
   deleteCheatingLog,
+  getMyCheatingLogs,
+  getAllCheatingLogs,
 } from "../controllers/cheatingLogController.js";
 import { createCategory, getCategories, deleteCategory } from "../controllers/categoryController.js";
 const examRoutes = express.Router();
@@ -26,6 +28,8 @@ examRoutes.route('/:id/access-code').put(protect, teacherOnly, updateExamAccessC
 // Categories
 examRoutes.route('/categories').get(protect, getCategories).post(protect, teacherOnly, createCategory);
 examRoutes.route('/categories/:id').delete(protect, teacherOnly, deleteCategory);
+examRoutes.route("/my-cheatingLogs").get(protect, studentOnly, getMyCheatingLogs);
+examRoutes.route("/cheatingLogs/all").get(protect, getAllCheatingLogs);
 examRoutes.route("/cheatingLogs/:examId").get(protect, teacherOnly, getCheatingLogsByExamId);
 examRoutes.route("/cheatingLogs").post(protect, studentOnly, saveCheatingLog);
 // Allow teacher to delete a cheating log entry by id

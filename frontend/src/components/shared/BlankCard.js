@@ -5,9 +5,15 @@ import PropTypes from 'prop-types';
 const BlankCard = ({ children, className }) => {
   return (
     <Card
-      sx={{ p: 0, position: 'relative', border: 1, borderColor: 'grey.500' }}
+      sx={{
+        p: 0,
+        position: 'relative',
+        borderRadius: 3,
+        border: 'none',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+      }}
       className={className}
-      elevation={9}
+      elevation={0}
       variant={undefined}
     >
       {children}

@@ -6,10 +6,10 @@ import {
   IconMoodHappy,
   IconTypography,
   IconUserPlus,
-  IconPlayerPlayFilled,
   IconSettings,
   IconClipboardList,
   IconUserCheck,
+  IconShieldCheck,
 } from '@tabler/icons-react';
 
 import { uniqueId } from 'lodash';
@@ -48,6 +48,13 @@ const Menuitems = [
     title: 'My Tasks',
     icon: IconClipboardList,
     href: '/my-tasks',
+  },
+  {
+    id: uniqueId(),
+    title: 'System Check',
+    icon: IconShieldCheck,
+    href: '/system-check',
+    role: 'student',
   },
   {
     navlabel: true,

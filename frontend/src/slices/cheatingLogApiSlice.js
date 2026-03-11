@@ -43,8 +43,29 @@ export const cheatingLogApiSlice = apiSlice.injectEndpoints({
         return tags.length ? tags : ['CheatingLogs'];
       },
     }),
+    // Get current student's own cheating logs
+    getMyCheatingLogs: builder.query({
+      query: () => ({
+        url: `${EXAMS_URL}/my-cheatingLogs`,
+        method: 'GET',
+      }),
+      providesTags: ['CheatingLogs'],
+    }),
+    getAllCheatingLogs: builder.query({
+      query: () => ({
+        url: `${EXAMS_URL}/cheatingLogs/all`,
+        method: 'GET',
+      }),
+      providesTags: ['CheatingLogs'],
+    }),
   }),
 });
 
 // Export the generated hooks for each endpoint
-export const { useGetCheatingLogsQuery, useSaveCheatingLogMutation, useDeleteCheatingLogMutation } = cheatingLogApiSlice;
+export const {
+  useGetCheatingLogsQuery,
+  useSaveCheatingLogMutation,
+  useDeleteCheatingLogMutation,
+  useGetMyCheatingLogsQuery,
+  useGetAllCheatingLogsQuery
+} = cheatingLogApiSlice;
