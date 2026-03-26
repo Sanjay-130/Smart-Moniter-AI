@@ -6,10 +6,14 @@ const connectDB = async () => {
 
   while (retries < MAX_RETRIES) {
     try {
-      const conn = await mongoose.connect(process.env.MONGO_URL, {
-        serverSelectionTimeoutMS: 5000,
+      const uri = process.env.MONGO_URL?.trim();
+      if (!uri) {
+        throw new Error("MONGO_URL not defined in .env");
+      }
+      const conn = await mongoose.connect(uri, {
+        serverSelectionTimeoutMS: 20000, 
         socketTimeoutMS: 45000,
-        family: 4, // Force IPv4
+        // family: 4, // Removed IPv4 constraint to allow system default resolution
       });
       console.log(`MongoDB Connected: ${conn.connection.host}`);
       return;
@@ -17,7 +21,7 @@ const connectDB = async () => {
       retries++;
       console.error(`MongoDB connection attempt ${retries} failed: ${error.message}`);
       if (retries >= MAX_RETRIES) {
-        console.error("Max retries reached. Server will start without DB connection.");
+        console.error("Max retries reached. Server started without DB connection. Check your Atlas IP Whitelist or connection string.");
         return;
       }
       console.log("Retrying in 5 seconds...");

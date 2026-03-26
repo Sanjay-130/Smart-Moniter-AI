@@ -1,6 +1,6 @@
 import express from 'express';
-import { protect, studentOnly } from '../middleware/authMiddleware.js';
-import { saveResult, getStudentResults, getExamResult } from '../controllers/resultController.js';
+import { protect, studentOnly, teacherOrAdmin } from '../middleware/authMiddleware.js';
+import { saveResult, getStudentResults, getExamResult, getExamResultsForTeacher } from '../controllers/resultController.js';
 
 const router = express.Router();
 
@@ -12,5 +12,8 @@ router.route('/student')
 
 router.route('/exam/:examId')
   .get(protect, getExamResult);
+
+router.route('/teacher/exam/:examId')
+  .get(protect, teacherOrAdmin, getExamResultsForTeacher);
 
 export default router;

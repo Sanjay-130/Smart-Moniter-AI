@@ -33,6 +33,23 @@ const userValidationSchema = yup.object({
     .required('Confirm Password is required')
     .oneOf([yup.ref('password'), null], 'Password must match'),
   role: yup.string().oneOf(['student', 'teacher'], 'Invalid role').required('Role is required'),
+  dob: yup.date()
+    .required('Date of birth is required')
+    .test('age-validation', 'Invalid age for selected role', function(value) {
+        if (!value) return false;
+        const ageDiff = Date.now() - new Date(value).getTime();
+        const ageDate = new Date(Math.abs(ageDiff));
+        const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+        
+        const role = this.parent.role;
+        if (role === 'student' && age < 18) {
+            return this.createError({ message: 'Student must be at least 18 years old' });
+        }
+        if (role === 'teacher' && age < 23) {
+            return this.createError({ message: 'Teacher must be at least 23 years old' });
+        }
+        return true;
+    }),
 });
 // initial values will be created inside component so we can read URL params
 
@@ -47,7 +64,9 @@ const Register = () => {
     rollNumber: '',
     password: '',
     confirm_password: '',
+    dob: '',
     role: roleParam,
+    profilePic: '',
   };
 
   const formik = useFormik({
@@ -73,12 +92,13 @@ const Register = () => {
 
   // submit handled via formik/onSubmit
 
-  const handleSubmit = async ({ name, email, rollNumber, password, confirm_password, role }) => {
+  const handleSubmit = async (formValues) => {
+    const { name, email, rollNumber, password, confirm_password, role, dob, profilePic } = formValues;
     if (password !== confirm_password) {
       toast.error('Passwords do not match');
     } else {
       try {
-        const payload = { name, email, password, role };
+        const payload = { name, email, password, role, dob, profilePic };
         if (role === 'student') payload.rollNumber = rollNumber;
         const res = await register(payload).unwrap();
         dispatch(setCredentials({ ...res }));

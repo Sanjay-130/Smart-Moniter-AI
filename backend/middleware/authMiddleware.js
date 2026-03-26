@@ -46,4 +46,14 @@ const adminOnly = asyncHandler(async (req, res, next) => {
   }
 });
 
-export { protect, teacherOnly, studentOnly, adminOnly };
+// Middleware to check if user is a teacher or admin
+const teacherOrAdmin = asyncHandler(async (req, res, next) => {
+  if (req.user && (req.user.role === 'teacher' || req.user.role === 'admin')) {
+    next();
+  } else {
+    res.status(403);
+    throw new Error("Access denied. Teachers or Admins only.");
+  }
+});
+
+export { protect, teacherOnly, studentOnly, adminOnly, teacherOrAdmin };

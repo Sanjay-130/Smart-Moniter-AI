@@ -78,6 +78,23 @@ const userValidationSchema = yup.object({
         .min(6, 'Password should be of minimum 6 characters length')
         .required('Password is required'),
     role: yup.string().oneOf(['student', 'teacher'], 'Invalid role').required('Role is required'),
+    dob: yup.date()
+        .required('Date of birth is required')
+        .test('age-validation', 'Invalid age for selected role', function(value) {
+            if (!value) return false;
+            const ageDiff = Date.now() - new Date(value).getTime();
+            const ageDate = new Date(Math.abs(ageDiff));
+            const age = Math.abs(ageDate.getUTCFullYear() - 1970);
+            
+            const role = this.parent.role;
+            if (role === 'student' && age < 18) {
+                return this.createError({ message: 'Student must be at least 18 years old' });
+            }
+            if (role === 'teacher' && age < 23) {
+                return this.createError({ message: 'Teacher must be at least 23 years old' });
+            }
+            return true;
+        }),
 });
 
 const SummaryCard = ({ title, value, icon, color }) => (
@@ -150,13 +167,19 @@ const AdminPage = () => {
                 toast.error('CSV file is empty or missing headers');
                 return;
             }
-            const headers = rows[0].split(',').map(h => h.trim().toLowerCase());
+            const headers = rows[0].split(',').map(h => {
+                let header = h.trim().toLowerCase();
+                if (header === 'rollnumber') return 'rollNumber';
+                return header;
+            });
             
             const usersToRegister = rows.slice(1).map(row => {
                 const values = row.split(',').map(v => v.trim());
                 const user = {};
                 headers.forEach((header, index) => {
-                    user[header] = values[index];
+                    if (values[index] !== '') {
+                        user[header] = values[index];
+                    }
                 });
                 return user;
             });

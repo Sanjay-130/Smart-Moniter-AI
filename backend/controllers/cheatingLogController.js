@@ -2,6 +2,7 @@ import asyncHandler from "express-async-handler";
 import mongoose from 'mongoose';
 import CheatingLog from "../models/cheatingLogModel.js";
 import User from "../models/userModel.js";
+import { uploadBase64 } from "../utils/cloudinaryConfig.js";
 
 // @desc Save cheating log data
 // @route POST /api/cheatingLogs
@@ -16,6 +17,7 @@ const saveCheatingLog = asyncHandler(async (req, res) => {
     examId,
     username,
     email,
+    screenshots = [],
   } = req.body;
 
   // Attempt to enrich with rollNumber if we can resolve the user
@@ -42,7 +44,31 @@ const saveCheatingLog = asyncHandler(async (req, res) => {
     username,
     email,
     rollNumber,
+    screenshots: [],
   });
+
+  // Upload screenshots to Cloudinary if present
+  if (Array.isArray(screenshots) && screenshots.length > 0) {
+    const uploadedScreenshots = await Promise.all(
+      screenshots.map(async (scr) => {
+        if (scr.image && scr.image.startsWith('data:image')) {
+          const url = await uploadBase64(scr.image, 'cheating-logs');
+          if (url) {
+            return {
+              image: url,
+              type: scr.type || 'UNKNOWN',
+              timestamp: scr.timestamp || new Date(),
+            };
+          }
+        } else if (scr.image) {
+          // Already a URL or direct string
+          return scr;
+        }
+        return null;
+      })
+    );
+    cheatingLog.screenshots = uploadedScreenshots.filter(Boolean);
+  }
 
   const savedLog = await cheatingLog.save();
 

@@ -16,11 +16,12 @@ import {
   resetPassword,
   bulkRegister,
 } from "../controllers/userController.js";
-import { protect, adminOnly, teacherOnly } from "../middleware/authMiddleware.js";
+import { protect, adminOnly, teacherOnly, teacherOrAdmin } from "../middleware/authMiddleware.js";
 import { saveCheatingLog } from "../controllers/cheatingLogController.js";
+import { upload } from "../middleware/uploadMiddleware.js";
 
 // Public routes
-userRoutes.post("/", registerUser);
+userRoutes.post("/", upload.single('profilePic'), registerUser);
 userRoutes.post("/auth", authUser);
 userRoutes.post("/logout", logoutUser);
 userRoutes.post("/forgot-password", forgotPassword);
@@ -35,13 +36,13 @@ userRoutes.delete('/:id', protect, adminOnly, deleteUser);
 userRoutes.post('/cheatingLogs', protect, saveCheatingLog);
 
 // teacher/admin unblock endpoint
-userRoutes.post('/unblock', protect, unblockUser);
+userRoutes.post('/unblock', protect, teacherOrAdmin, unblockUser);
 
-// teacher-only block endpoint
-userRoutes.post('/block', protect, teacherOnly, blockUser);
+// teacher/admin block endpoint
+userRoutes.post('/block', protect, teacherOrAdmin, blockUser);
 
-// teacher-only: lookup student by email/rollNumber
-userRoutes.get('/student', protect, teacherOnly, getStudentByIdentifier);
+// teacher/admin: lookup student by email/rollNumber
+userRoutes.get('/student', protect, teacherOrAdmin, getStudentByIdentifier);
 
 // teacher/admin: student's full history
 userRoutes.get('/student/history', protect, getStudentHistory);
@@ -50,6 +51,6 @@ userRoutes.get('/student/history', protect, getStudentHistory);
 userRoutes
   .route("/profile")
   .get(protect, getUserProfile)
-  .put(protect, updateUserProfile);
+  .put(protect, upload.single('profilePic'), updateUserProfile);
 
 export default userRoutes;

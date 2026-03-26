@@ -92,6 +92,12 @@ const Menuitems = [
   },
   {
     id: uniqueId(),
+    title: 'Results',
+    icon: IconCopy,
+    href: '/manage-exams',
+  },
+  {
+    id: uniqueId(),
     title: 'Block Student',
     icon: IconUserCheck,
     href: '/block-student',

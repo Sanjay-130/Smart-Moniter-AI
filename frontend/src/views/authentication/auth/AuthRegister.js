@@ -1,5 +1,6 @@
 import React from 'react';
-import { Box, Typography, Button, Select, MenuItem } from '@mui/material';
+import { Box, Typography, Button, Select, MenuItem, Avatar, IconButton } from '@mui/material';
+import { IconCamera, IconX } from '@tabler/icons-react';
 
 import CustomTextField from '../../../components/forms/theme-elements/CustomTextField';
 import { Stack } from '@mui/system';
@@ -17,6 +18,70 @@ const AuthRegister = ({ formik, title, subtitle, subtext }) => {
       {subtext}
 
       <Box component="form">
+        <Stack mb={3} alignItems="center" spacing={1}>
+          <Box sx={{ position: 'relative' }}>
+            <Avatar
+              src={values.profilePic || ''}
+              sx={{ width: 100, height: 100, border: '2px solid #5D87FF' }}
+            >
+              {!values.profilePic && values.name?.charAt(0)}
+            </Avatar>
+            <input
+              accept="image/*"
+              style={{ display: 'none' }}
+              id="profile-pic-upload"
+              type="file"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onloadend = () => {
+                    formik.setFieldValue('profilePic', reader.result);
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+            />
+            <label htmlFor="profile-pic-upload">
+              <IconButton
+                color="primary"
+                component="span"
+                sx={{
+                  position: 'absolute',
+                  bottom: -5,
+                  right: -5,
+                  bgcolor: 'white',
+                  boxShadow: 2,
+                  '&:hover': { bgcolor: '#f5f5f5' }
+                }}
+                size="small"
+              >
+                <IconCamera size={18} />
+              </IconButton>
+            </label>
+            {values.profilePic && (
+              <IconButton
+                color="error"
+                size="small"
+                onClick={() => formik.setFieldValue('profilePic', '')}
+                sx={{
+                  position: 'absolute',
+                  top: -5,
+                  right: -5,
+                  bgcolor: 'white',
+                  boxShadow: 2,
+                  '&:hover': { bgcolor: '#f5f5f5' }
+                }}
+              >
+                <IconX size={16} />
+              </IconButton>
+            )}
+          </Box>
+          <Typography variant="caption" color="textSecondary">
+            Upload Profile Picture (Optional)
+          </Typography>
+        </Stack>
+
         <Stack mb={1}>
           <Typography
             variant="subtitle1"
@@ -67,6 +132,31 @@ const AuthRegister = ({ formik, title, subtitle, subtext }) => {
             fullWidth
             // onChange={onEmailChange} // Call the callback function on change
             //   size="small"
+          />
+
+          <Typography
+            variant="subtitle1"
+            fontWeight={600}
+            component="label"
+            htmlFor="dob"
+            mb="5px"
+            mt="10px"
+          >
+            Date of Birth
+          </Typography>
+          <CustomTextField
+            id="dob"
+            name="dob"
+            type="date"
+            InputLabelProps={{ shrink: true }}
+            variant="outlined"
+            value={values.dob}
+            onChange={handleChange}
+            onBlur={handleBlur}
+            error={touched.dob && errors.dob ? true : false}
+            helperText={touched.dob && errors.dob ? errors.dob : null}
+            required
+            fullWidth
           />
 
           {values.role === 'student' ? (

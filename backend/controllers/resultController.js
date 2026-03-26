@@ -153,3 +153,29 @@ export const getExamResult = asyncHandler(async (req, res) => {
 
   res.json(result);
 });
+
+// @desc    Get all student results for a specific exam (Teacher only)
+// @route   GET /api/results/teacher/exam/:examId
+// @access  Private/Teacher
+export const getExamResultsForTeacher = asyncHandler(async (req, res) => {
+  const { examId } = req.params;
+
+  const exam = await Exam.findById(examId);
+  if (!exam) {
+    res.status(404);
+    throw new Error('Exam not found');
+  }
+
+  // Get all results for this exam
+  const results = await Result.find({ exam: examId })
+    .populate('student', 'name email rollNumber profilePic')
+    .populate('answers.questionId', 'questionText options correctOption questionType codeQuestion')
+    .sort({ submittedAt: -1 });
+
+  res.json({
+    examName: exam.examName,
+    totalQuestions: exam.totalQuestions,
+    duration: exam.duration,
+    results
+  });
+});

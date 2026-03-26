@@ -41,6 +41,18 @@ const resultsApiSlice = apiSlice.injectEndpoints({
       providesTags: (result, error, examId) => [{ type: 'Results', examId }],
       keepUnusedDataFor: 5,
     }),
+    getExamResultsForTeacher: builder.query({
+      query: (examId) => ({
+        url: `${RESULTS_URL}/teacher/exam/${examId}`,
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${Cookies.get('jwt')}`,
+        },
+        credentials: 'include',
+      }),
+      providesTags: (result, error, examId) => [{ type: 'TeacherResults', examId }],
+      keepUnusedDataFor: 5,
+    }),
     saveResult: builder.mutation({
       query: (data) => ({
         url: `${RESULTS_URL}`,
@@ -60,6 +72,7 @@ const resultsApiSlice = apiSlice.injectEndpoints({
 export const {
   useGetResultsQuery,
   useGetExamResultQuery,
+  useGetExamResultsForTeacherQuery,
   useSaveResultMutation,
 } = resultsApiSlice;
 

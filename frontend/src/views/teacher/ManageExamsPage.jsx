@@ -15,7 +15,7 @@ import {
   TextField,
   Stack,
 } from '@mui/material';
-import { IconTrash, IconPlus, IconLock, IconLockOpen, IconListDetails } from '@tabler/icons-react';
+import { IconTrash, IconPlus, IconLock, IconLockOpen, IconListDetails, IconClipboardList } from '@tabler/icons-react';
 import PageContainer from 'src/components/container/PageContainer';
 import DashboardCard from '../../components/shared/DashboardCard';
 import { useGetExamsQuery, useDeleteExamMutation, useGetCategoriesQuery, useDeleteCategoryMutation, useUpdateExamAccessCodeMutation } from 'src/slices/examApiSlice';
@@ -252,6 +252,20 @@ const ManageExamsPage = () => {
                         }}
                       >
                         View Logs
+                      </Button>
+                      <Button
+                        variant="contained"
+                        size="small"
+                        color="success"
+                        startIcon={<IconClipboardList size={16} />}
+                        onClick={() => navigate(`/exam-results?examId=${exam._id}`)}
+                        fullWidth
+                        sx={{
+                          background: 'linear-gradient(135deg, #1B5E20 0%, #388E3C 100%)',
+                          fontWeight: 600
+                        }}
+                      >
+                        Results
                       </Button>
                     </Stack>
                   </CardContent>

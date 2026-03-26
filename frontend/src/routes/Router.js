@@ -45,6 +45,7 @@ const TeacherProfile = Loadable(lazy(() => import('./../views/teacher/ProfilePag
 const PrivateRoute = Loadable(lazy(() => import('src/views/authentication/PrivateRoute')));
 const TeacherRoute = Loadable(lazy(() => import('src/views/authentication/TeacherRoute')));
 const BlockStudentPage = Loadable(lazy(() => import('./../views/teacher/BlockStudentPage')));
+const TeacherExamResults = Loadable(lazy(() => import('./../views/teacher/TeacherExamResults')));
 const AdminPage = Loadable(lazy(() => import('./../views/admin/AdminPage')));
 const AdminRoute = Loadable(lazy(() => import('../views/authentication/AdminRoute')));
 const AdminLogin = Loadable(lazy(() => import('../views/authentication/AdminLogin')));
@@ -75,8 +76,8 @@ const Router = createBrowserRouter(
             <Route path="/assign-exam" exact={true} element={<AssignExamPage />} />
             <Route path="/exam-log" exact={true} element={<ExamLogPage />} />
             <Route path="/teacher-profile" exact={true} element={<TeacherProfile />} />
-            <Route path="/teacher-profile" exact={true} element={<TeacherProfile />} />
             <Route path="/block-student" exact={true} element={<BlockStudentPage />} />
+            <Route path="/exam-results" exact={true} element={<TeacherExamResults />} />
           </Route>
         </Route>
         <Route path="/" element={<ExamLayout />}>

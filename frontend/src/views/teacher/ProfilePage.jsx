@@ -117,6 +117,7 @@ const ProfilePage = () => {
           <Grid item xs={12} md={4}>
             <Card sx={{ p: 3, textAlign: 'center', height: '100%' }}>
               <Avatar
+                src={displayUser?.profilePic}
                 sx={{
                   width: 120,
                   height: 120,
@@ -126,7 +127,7 @@ const ProfilePage = () => {
                   mb: 2,
                 }}
               >
-                {getInitials(displayUser?.name)}
+                {!displayUser?.profilePic && getInitials(displayUser?.name)}
               </Avatar>
               <Typography variant="h5" fontWeight={600} mb={1}>
                 {displayUser?.name}

@@ -10,6 +10,7 @@ import sendEmail from "../utils/sendEmail.js";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { uploadBase64 } from "../utils/cloudinaryConfig.js";
 
 const authUser = asyncHandler(async (req, res) => {
   // Authenticate using rollNumber OR email + password.
@@ -208,6 +209,24 @@ const registerUser = asyncHandler(async (req, res) => {
   // Teachers: require email, rollNumber optional
   const { name, email, password, role, rollNumber, dob } = req.body;
 
+  if (!dob) {
+    res.status(400);
+    throw new Error('Date of birth is required');
+  }
+
+  const ageDiff = Date.now() - new Date(dob).getTime();
+  const age = Math.abs(new Date(ageDiff).getUTCFullYear() - 1970);
+
+  if (role === 'student' && age < 18) {
+    res.status(400);
+    throw new Error('Student must be at least 18 years old');
+  }
+  
+  if (role === 'teacher' && age < 23) {
+    res.status(400);
+    throw new Error('Teacher must be at least 23 years old');
+  }
+
   if (role === 'student') {
     if (!rollNumber) {
       res.status(400);
@@ -232,6 +251,16 @@ const registerUser = asyncHandler(async (req, res) => {
     throw new Error('Email is required for teacher registration');
   }
 
+  let profilePicUrl = '';
+  if (req.file) {
+    profilePicUrl = req.file.path;
+  } else if (req.body.profilePic && req.body.profilePic.startsWith('data:image')) {
+    const url = await uploadBase64(req.body.profilePic, 'profiles');
+    if (url) profilePicUrl = url;
+  } else {
+    profilePicUrl = req.body.profilePic || '';
+  }
+
   const user = await User.create({
     name,
     email,
@@ -239,7 +268,7 @@ const registerUser = asyncHandler(async (req, res) => {
     role,
     rollNumber,
     dob,
-    profilePic: req.body.profilePic || '',
+    profilePic: profilePicUrl,
   });
 
   if (user) {
@@ -302,7 +331,15 @@ const updateUserProfile = asyncHandler(async (req, res) => {
     user.name = req.body.name || user.name;
     user.email = req.body.email || user.email;
     user.dob = req.body.dob || user.dob;
-    user.profilePic = req.body.profilePic !== undefined ? req.body.profilePic : user.profilePic;
+    
+    if (req.file) {
+      user.profilePic = req.file.path;
+    } else if (req.body.profilePic && req.body.profilePic.startsWith('data:image')) {
+      const url = await uploadBase64(req.body.profilePic, 'profiles');
+      if (url) user.profilePic = url;
+    } else if (req.body.profilePic !== undefined) {
+      user.profilePic = req.body.profilePic;
+    }
     // allow updating rollNumber but ensure uniqueness
     if (req.body.rollNumber && req.body.rollNumber !== user.rollNumber) {
       const exists = await User.findOne({ rollNumber: req.body.rollNumber });
@@ -312,7 +349,6 @@ const updateUserProfile = asyncHandler(async (req, res) => {
       }
       user.rollNumber = req.body.rollNumber;
     }
-    user.role = req.body.role || user.role;
 
     if (req.body.password) {
       user.password = req.body.password;
@@ -323,6 +359,7 @@ const updateUserProfile = asyncHandler(async (req, res) => {
       _id: updatedUser._id,
       name: updatedUser.name,
       email: updatedUser.email,
+      rollNumber: updatedUser.rollNumber,
       dob: updatedUser.dob,
       profilePic: updatedUser.profilePic,
       role: updatedUser.role,
@@ -562,6 +599,21 @@ const bulkRegister = asyncHandler(async (req, res) => {
 
       if (role === 'teacher' && !email) {
         throw new Error(`Email is required for teacher: ${name}`);
+      }
+
+      if (!dob) {
+        throw new Error(`Date of birth is required for user: ${name || 'Unknown'}`);
+      }
+      
+      const ageDiff = Date.now() - new Date(dob).getTime();
+      const age = Math.abs(new Date(ageDiff).getUTCFullYear() - 1970);
+      
+      if (role === 'student' && age < 18) {
+        throw new Error(`Student ${name} must be at least 18 years old`);
+      }
+      
+      if (role === 'teacher' && age < 23) {
+        throw new Error(`Teacher ${name} must be at least 23 years old`);
       }
 
       // Check existence
