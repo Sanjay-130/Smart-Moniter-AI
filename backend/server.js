@@ -96,26 +96,8 @@ app.use(notFound);
 app.use(errorHandler);
 
 // Server
-app.listen(port, async () => {
+app.listen(port, () => {
   console.log(`server is running on http://localhost:${port}`);
-
-  // Seed default admin if not exists
-  try {
-    const User = (await import("./models/userModel.js")).default;
-    const adminExists = await User.findOne({ role: 'admin' });
-    if (!adminExists) {
-      console.log('Seeding default admin user...');
-      await User.create({
-        name: 'System Admin',
-        email: 'admin@collage.com',
-        password: 'admin123',
-        role: 'admin'
-      });
-      console.log('Default admin created successfully.');
-    }
-  } catch (error) {
-    console.error('Error seeding admin user:', error);
-  }
 });
 
 // Todos:

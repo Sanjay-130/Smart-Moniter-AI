@@ -177,10 +177,44 @@ cd frontend && npm run build
 cd ../backend && npm start
 ```
 
-### Default Admin Account
-The system automatically creates a default admin on first run:
-- **Email**: `admin@collage.com`
-- **Password**: `admin123`
+### Creating an Admin Account
+Since there's no hard-coded default admin, you need to create one manually:
+
+**Option 1: Direct MongoDB insertion**
+```bash
+# Use MongoDB shell or Compass to insert an admin user
+# Password will be hashed automatically by the User model pre-save hook
+```
+
+**Option 2: Create seed script** (`backend/seeds/adminSeed.js`):
+```javascript
+import mongoose from 'mongoose';
+import User from '../models/userModel.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+const createAdmin = async () => {
+  await mongoose.connect(process.env.MONGO_URI);
+  
+  const adminExists = await User.findOne({ role: 'admin' });
+  if (!adminExists) {
+    await User.create({
+      name: 'System Admin',
+      email: 'admin@collage.com',
+      password: 'admin123',
+      role: 'admin'
+    });
+    console.log('Admin created successfully');
+  } else {
+    console.log('Admin already exists');
+  }
+  
+  process.exit();
+};
+
+createAdmin();
+```
 
 ---
 
